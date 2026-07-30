@@ -15,6 +15,13 @@
       "when": 1785411325185,
       "tag": "0001_cloudy_dracula",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785420390955,
+      "tag": "0002_normal_stature",
+      "breakpoints": true
     }
   ]
 }

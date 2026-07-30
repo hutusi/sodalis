@@ -33,6 +33,10 @@ const timestamps = {
 // ---------------------------------------------------------------------------
 
 export const localeEnum = pgEnum("locale", ["en", "zh-CN"]);
+// Where the current admin grant came from — its own source can revoke it:
+// 'env' = ADMIN_EMAILS list, 'group' = IdP group claim, 'manual' = granted
+// in-app/DB and never auto-revoked by logins.
+export const adminViaEnum = pgEnum("admin_via", ["manual", "env", "group"]);
 export const sizePrefEnum = pgEnum("size_pref", ["pair_only", "flex_2_4"]);
 export const signupSourceEnum = pgEnum("signup_source", ["manual", "standing"]);
 export const signupStatusEnum = pgEnum("signup_status", ["active", "cancelled"]);
@@ -123,6 +127,7 @@ export const users = pgTable(
     contactExtra: text("contact_extra"),
     contactVisible: boolean("contact_visible").notNull().default(false),
     isAdmin: boolean("is_admin").notNull().default(false),
+    adminVia: adminViaEnum("admin_via"),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     ...timestamps,
   },

@@ -100,6 +100,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider === "oidc" && profile) {
         const claims = profile as Record<string, unknown>;
         const groups = claims["groups"];
+        const groupsKnown =
+          env.OIDC_ADMIN_GROUP !== undefined && Array.isArray(groups);
         const info: LoginInfo = {
           email: String(profile.email ?? token.email ?? ""),
           name: typeof profile.name === "string" ? profile.name : undefined,
@@ -113,9 +115,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               ? (claims[env.OIDC_CLAIM_OFFICE] as string)
               : undefined,
           adminByGroup:
-            env.OIDC_ADMIN_GROUP !== undefined &&
-            Array.isArray(groups) &&
-            groups.includes(env.OIDC_ADMIN_GROUP),
+            groupsKnown && (groups as unknown[]).includes(env.OIDC_ADMIN_GROUP),
+          groupsKnown,
         };
         if (info.email) {
           const dbUser = await upsertUserFromLogin(info);

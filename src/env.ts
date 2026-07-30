@@ -15,7 +15,7 @@ const schema = z.object({
     .default("postgres://sodalis:sodalis@localhost:5432/sodalis"),
 
   // Auth.js
-  AUTH_SECRET: z.string().default("dev-secret-change-me"),
+  AUTH_SECRET: z.string().optional(),
   AUTH_URL: z.string().optional(),
 
   // OIDC SSO (feature-flagged by presence of issuer + client id/secret)
@@ -60,9 +60,34 @@ const schema = z.object({
   MATCH_CATCH_UP_HOURS: z.coerce.number().default(3),
 });
 
-export type Env = z.infer<typeof schema>;
+const DEV_FALLBACK_SECRET = "dev-secret-change-me";
 
-export const env: Env = schema.parse(process.env);
+export type Env = Omit<z.infer<typeof schema>, "AUTH_SECRET"> & {
+  AUTH_SECRET: string;
+};
+
+const parsed = schema.parse(process.env);
+
+// Sessions are JWTs signed with AUTH_SECRET; a guessable secret lets anyone
+// forge an admin session. Enforced at runtime, not during `next build`
+// (NEXT_PHASE) — build machines have no secrets and need none.
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+if (parsed.NODE_ENV === "production" && !isBuildPhase) {
+  if (
+    !parsed.AUTH_SECRET ||
+    parsed.AUTH_SECRET === DEV_FALLBACK_SECRET ||
+    parsed.AUTH_SECRET.length < 16
+  ) {
+    throw new Error(
+      "AUTH_SECRET must be set to a strong value in production — generate one with: openssl rand -base64 32",
+    );
+  }
+}
+
+export const env: Env = {
+  ...parsed,
+  AUTH_SECRET: parsed.AUTH_SECRET ?? DEV_FALLBACK_SECRET,
+};
 
 export const adminEmails = new Set(
   env.ADMIN_EMAILS.split(",")

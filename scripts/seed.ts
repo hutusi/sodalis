@@ -127,7 +127,9 @@ async function seedDemoUsers(officeIds: string[]) {
         officeId: officeIds[officeIdx],
         locale: "zh-CN",
         // First demo user doubles as an admin for local admin-UI work.
+        // 'manual' provenance: logins never auto-revoke it.
         isAdmin: local === "wang.wei",
+        adminVia: local === "wang.wei" ? ("manual" as const) : null,
       })
       .onConflictDoNothing({ target: users.email });
   }
