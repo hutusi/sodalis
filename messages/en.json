@@ -1,0 +1,166 @@
+{
+  "common": {
+    "appName": "Sodalis",
+    "tagline": "Random lunch, real connections",
+    "nav": {
+      "dashboard": "Dashboard",
+      "standing": "Recurring",
+      "history": "History",
+      "profile": "Profile",
+      "admin": "Admin"
+    },
+    "signOut": "Sign out",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "confirm": "Confirm",
+    "loading": "Loading…",
+    "saved": "Saved",
+    "yes": "Yes",
+    "no": "No",
+    "none": "—",
+    "language": "Language"
+  },
+  "login": {
+    "title": "Sign in to Sodalis",
+    "subtitle": "Get matched with colleagues for lunch and meet people beyond your team.",
+    "sso": "Sign in with Company SSO",
+    "ldapToggle": "Sign in with password",
+    "username": "Username",
+    "password": "Password",
+    "ldapSubmit": "Sign in",
+    "devTitle": "Dev login",
+    "devEmail": "Seeded user email",
+    "devSubmit": "Sign in as user",
+    "error": "Sign-in failed. Check your credentials and try again."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "today": "Today",
+    "signupOpen": "Signup open until {time}",
+    "signupClosed": "Signup closed at {time}",
+    "notWorkingDay": "No activity today ({reason})",
+    "holiday": "public holiday",
+    "weekend": "weekend",
+    "signedUp": "You're in for {activity} on {date}",
+    "notSignedUp": "Not signed up",
+    "join": "Count me in",
+    "leave": "Cancel signup",
+    "sizePref": "Group size",
+    "sizePairOnly": "Pairs only",
+    "sizeFlex": "2–4 people is fine",
+    "willingToHost": "Willing to host (搭主)",
+    "hostHint": "Light duty: create the group chat and pick a time everyone can make. That's it.",
+    "upcoming": "Upcoming days",
+    "matched": "Your lunch group",
+    "matching": "Matching in progress — results by {time}",
+    "noOffice": "Pick your office in Profile before signing up.",
+    "unmatchedToday": "We couldn't find you a group today — sorry! You're first in line next time."
+  },
+  "group": {
+    "host": "Host",
+    "hostless": "No host today — self-organize!",
+    "venue": "Suggested venue",
+    "venueHint": "Just a suggestion — the group can go anywhere.",
+    "eventTime": "Time",
+    "members": "Members",
+    "contactHidden": "contact hidden",
+    "department": "Department"
+  },
+  "standing": {
+    "title": "Recurring signup",
+    "subtitle": "Automatically sign up on the weekdays you pick. Skipped on public holidays; a makeup working Saturday counts only if you selected every weekday.",
+    "weekdays": "Auto-enroll on",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "paused": "Paused",
+    "pause": "Pause",
+    "resume": "Resume",
+    "notConfigured": "No recurring signup yet.",
+    "remove": "Remove recurring signup"
+  },
+  "history": {
+    "title": "People I've met",
+    "empty": "No lunches yet — sign up and meet someone new!",
+    "metOn": "Lunch on {date}",
+    "timesMet": "{count, plural, one {met once} other {met # times}}"
+  },
+  "profile": {
+    "title": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "department": "Department",
+    "departmentHint": "Synced from the company directory at sign-in.",
+    "office": "Office",
+    "officeHint": "Matching happens within your office.",
+    "selectOffice": "Select office…",
+    "language": "Language",
+    "contact": "Contact info",
+    "contactPlaceholder": "Phone / IM handle shown to your lunch group",
+    "contactVisible": "Show my contact info to matched colleagues"
+  },
+  "admin": {
+    "title": "Admin",
+    "nav": {
+      "overview": "Overview",
+      "org": "Org & venues",
+      "activities": "Activities",
+      "holidays": "Holidays",
+      "runs": "Match runs"
+    },
+    "org": {
+      "cities": "Cities",
+      "offices": "Offices",
+      "cafeterias": "Cafeterias",
+      "nameEn": "Name (EN)",
+      "nameZh": "Name (中文)",
+      "timezone": "Timezone",
+      "city": "City",
+      "office": "Office",
+      "active": "Active"
+    },
+    "activities": {
+      "title": "Activity types",
+      "key": "Key",
+      "close": "Signup closes",
+      "notifyBy": "Notify by",
+      "eventAt": "Event time"
+    },
+    "holidays": {
+      "title": "Holiday calendar",
+      "subtitle": "Days marked 'holiday' skip matching; 'makeup workday' (调休) runs matching on a weekend date.",
+      "date": "Date",
+      "kind": "Kind",
+      "holiday": "Holiday",
+      "workday": "Makeup workday",
+      "label": "Label",
+      "addDay": "Add day"
+    },
+    "runs": {
+      "title": "Match runs",
+      "date": "Date",
+      "office": "Office",
+      "status": "Status",
+      "groups": "Groups",
+      "pool": "Pool",
+      "unmatched": "Unmatched",
+      "rerun": "Re-run matching",
+      "rerunHint": "Supersedes the current result and notifies affected users.",
+      "seed": "Seed",
+      "trigger": "Trigger",
+      "notifications": "Notifications",
+      "noRuns": "No runs yet."
+    },
+    "overview": {
+      "signupsToday": "Signups today",
+      "runsToday": "Runs today",
+      "pendingNotifications": "Pending notifications",
+      "failedNotifications": "Failed notifications"
+    }
+  }
+}

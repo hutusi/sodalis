@@ -1,0 +1,1 @@
+ALTER TYPE "public"."notify_status" ADD VALUE 'cancelled';
