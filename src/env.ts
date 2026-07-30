@@ -10,9 +10,7 @@ const schema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
 
-  DATABASE_URL: z
-    .string()
-    .default("postgres://sodalis:sodalis@localhost:5432/sodalis"),
+  DATABASE_URL: z.string().optional(),
 
   // Auth.js
   AUTH_SECRET: z.string().optional(),
@@ -61,16 +59,23 @@ const schema = z.object({
 });
 
 const DEV_FALLBACK_SECRET = "dev-secret-change-me";
+const DEV_FALLBACK_DB = "postgres://sodalis:sodalis@localhost:5432/sodalis";
 
-export type Env = Omit<z.infer<typeof schema>, "AUTH_SECRET"> & {
+export type Env = Omit<
+  z.infer<typeof schema>,
+  "AUTH_SECRET" | "DATABASE_URL"
+> & {
   AUTH_SECRET: string;
+  DATABASE_URL: string;
 };
 
 const parsed = schema.parse(process.env);
 
-// Sessions are JWTs signed with AUTH_SECRET; a guessable secret lets anyone
-// forge an admin session. Enforced at runtime, not during `next build`
-// (NEXT_PHASE) — build machines have no secrets and need none.
+// Production must not run on dev fallbacks: a guessable AUTH_SECRET lets
+// anyone forge an admin session (JWT strategy), a defaulted DATABASE_URL
+// points at nothing real, and dev-login bypasses SSO entirely. Enforced at
+// runtime, not during `next build` (NEXT_PHASE) — build machines have no
+// secrets and need none.
 const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 if (parsed.NODE_ENV === "production" && !isBuildPhase) {
   if (
@@ -82,11 +87,20 @@ if (parsed.NODE_ENV === "production" && !isBuildPhase) {
       "AUTH_SECRET must be set to a strong value in production — generate one with: openssl rand -base64 32",
     );
   }
+  if (!parsed.DATABASE_URL) {
+    throw new Error("DATABASE_URL must be set explicitly in production");
+  }
+  if (parsed.DEV_LOGIN_ENABLED) {
+    // auth/index.ts also ignores the flag in production; this hard stop
+    // makes the misconfiguration impossible to miss.
+    throw new Error("DEV_LOGIN_ENABLED must not be true in production");
+  }
 }
 
 export const env: Env = {
   ...parsed,
   AUTH_SECRET: parsed.AUTH_SECRET ?? DEV_FALLBACK_SECRET,
+  DATABASE_URL: parsed.DATABASE_URL ?? DEV_FALLBACK_DB,
 };
 
 export const adminEmails = new Set(

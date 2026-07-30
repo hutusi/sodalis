@@ -20,19 +20,21 @@ FROM node:22-slim AS app
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/public ./public
+USER node
 EXPOSE 3000
 CMD ["node", "server.js"]
 
 FROM oven/bun:1-slim AS worker
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=base /app/node_modules ./node_modules
-COPY package.json tsconfig.json drizzle.config.ts ./
-COPY src ./src
-COPY drizzle ./drizzle
-COPY data ./data
-COPY scripts ./scripts
+COPY --from=base --chown=bun:bun /app/node_modules ./node_modules
+COPY --chown=bun:bun package.json tsconfig.json drizzle.config.ts ./
+COPY --chown=bun:bun src ./src
+COPY --chown=bun:bun drizzle ./drizzle
+COPY --chown=bun:bun data ./data
+COPY --chown=bun:bun scripts ./scripts
+USER bun
 CMD ["bun", "run", "src/worker/index.ts"]

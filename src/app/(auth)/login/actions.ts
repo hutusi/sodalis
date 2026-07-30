@@ -6,7 +6,12 @@ import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
 
 export async function ssoSignIn() {
-  await signIn("oidc", { redirectTo: "/" });
+  try {
+    await signIn("oidc", { redirectTo: "/" });
+  } catch (error) {
+    if (error instanceof AuthError) redirect("/login?error=1");
+    throw error;
+  }
 }
 
 export async function ldapSignIn(formData: FormData) {

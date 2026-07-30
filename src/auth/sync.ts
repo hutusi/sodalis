@@ -1,10 +1,9 @@
 import { eq, ilike, or } from "drizzle-orm";
 
 import { db } from "@/db";
-import { offices, users, type adminViaEnum } from "@/db/schema";
+import { offices, users } from "@/db/schema";
 import { adminEmails } from "@/env";
-
-type AdminVia = (typeof adminViaEnum.enumValues)[number] | null;
+import { computeAdmin } from "./admin";
 
 export type LoginInfo = {
   email: string;
@@ -29,30 +28,6 @@ async function resolveOfficeId(hint: string | undefined) {
     where: or(ilike(offices.nameEn, hint), ilike(offices.nameZh, hint)),
   });
   return office?.id;
-}
-
-/**
- * Effective admin, recomputed per login with source provenance: each source
- * (env list, IdP group) grants and revokes only its own grants; 'manual'
- * grants are never touched by logins. A login that carries no group info
- * (LDAP/dev, or OIDC without OIDC_ADMIN_GROUP) cannot revoke a group grant.
- */
-function computeAdmin(
-  info: LoginInfo,
-  email: string,
-  current: { isAdmin: boolean; adminVia: AdminVia },
-): { isAdmin: boolean; adminVia: AdminVia } {
-  if (adminEmails.has(email)) return { isAdmin: true, adminVia: "env" };
-  if (info.groupsKnown && info.adminByGroup) {
-    return { isAdmin: true, adminVia: "group" };
-  }
-  if (current.isAdmin) {
-    if (current.adminVia === "env") return { isAdmin: false, adminVia: null };
-    if (current.adminVia === "group" && info.groupsKnown) {
-      return { isAdmin: false, adminVia: null };
-    }
-  }
-  return current;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -83,6 +58,7 @@ export async function upsertUserFromLogin(info: LoginInfo) {
     existing
       ? { isAdmin: existing.isAdmin, adminVia: existing.adminVia }
       : { isAdmin: false, adminVia: null },
+    adminEmails,
   );
 
   if (!existing) {
@@ -123,8 +99,9 @@ export async function upsertUserFromLogin(info: LoginInfo) {
     // The new email already belongs to another (stale) account; keep the
     // old address rather than blocking the login.
     if (!isUniqueViolation(error)) throw error;
+    // No PII in logs: identify the affected row by id only.
     console.warn(
-      `[auth] email ${email} already taken by another account; keeping ${existing.email} for subject ${info.subject}`,
+      `[auth] login email change for user ${existing.id} collided with another account; keeping the previous address`,
     );
     const [updated] = await db
       .update(users)

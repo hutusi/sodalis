@@ -51,6 +51,35 @@ jobs.push(
   }),
 );
 
+// Session advisory locks die with their connection. If lockConn was ever
+// reconnected (server restart, network blip), this process would keep
+// running WITHOUT the lock while a standby acquires it — two active
+// workers. Verify the lock every minute and exit for a clean restart
+// (compose restarts us; on boot we re-acquire or idle) when it's gone.
+jobs.push(
+  new Cron("0 * * * * *", { protect: true }, async () => {
+    try {
+      const [{ held }] = await lockConn<[{ held: boolean }]>`
+        select exists(
+          select 1 from pg_locks
+          where locktype = 'advisory'
+            and classid = 0
+            and objid = ${WORKER_LOCK_ID}
+            and pid = pg_backend_pid()
+            and granted
+        ) as held
+      `;
+      if (!held) {
+        console.error("[worker] advisory lock lost — exiting for restart");
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error("[worker] lock check failed — exiting for restart:", error);
+      process.exit(1);
+    }
+  }),
+);
+
 async function shutdown(signal: string) {
   console.log(`[worker] ${signal} received, shutting down`);
   for (const job of jobs) job.stop();

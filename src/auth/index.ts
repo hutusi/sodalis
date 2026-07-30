@@ -118,10 +118,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             groupsKnown && (groups as unknown[]).includes(env.OIDC_ADMIN_GROUP),
           groupsKnown,
         };
-        if (info.email) {
-          const dbUser = await upsertUserFromLogin(info);
-          token.uid = dbUser.id;
+        if (!info.email) {
+          // Fail loudly: continuing without an email would mint a session
+          // whose uid is never set, and every page would silently bounce
+          // the "signed-in" user back to /login.
+          throw new Error(
+            "OIDC profile contains no email claim — check the IdP scope/claim configuration",
+          );
         }
+        const dbUser = await upsertUserFromLogin(info);
+        token.uid = dbUser.id;
       } else if (account && user?.id) {
         // Credentials providers (ldap/dev) already upserted in authorize().
         token.uid = user.id;
