@@ -61,6 +61,8 @@ export const notifyStatusEnum = pgEnum("notify_status", [
   "sending",
   "sent",
   "failed",
+  // Superseded before delivery (admin re-run) — must not reach the user.
+  "cancelled",
 ]);
 
 // ---------------------------------------------------------------------------

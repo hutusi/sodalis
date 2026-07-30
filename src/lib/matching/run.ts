@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, isNotNull, max, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, like, max } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -16,6 +16,7 @@ import {
 import type { NotificationPayload } from "../notify/types";
 import { addDays, type LocalDate } from "../time";
 import { matchEngine, type HostStats } from "./engine";
+import { matchAdvisoryLock } from "./lock";
 import {
   HISTORY_WINDOW_DAYS,
   HOST_WINDOW_DAYS,
@@ -23,7 +24,7 @@ import {
   type PoolMember,
 } from "./scoring";
 
-const LIVE_STATUSES = ["pending", "running", "completed"] as const;
+export const LIVE_STATUSES = ["pending", "running", "completed"] as const;
 
 export type RunMatchOptions = {
   officeId: string;
@@ -47,9 +48,8 @@ export async function runMatch(opts: RunMatchOptions): Promise<RunMatchResult> {
   const startedAt = Date.now();
   try {
     return await db.transaction(async (tx) => {
-      const lockKey = `${opts.officeId}:${opts.activityTypeId}:${opts.date}`;
       await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${lockKey}, 42))`,
+        matchAdvisoryLock(opts.officeId, opts.activityTypeId, opts.date),
       );
 
       const keyWhere = and(
@@ -73,6 +73,19 @@ export async function runMatch(opts: RunMatchOptions): Promise<RunMatchResult> {
             .where(eq(matchRuns.id, old.id));
           // Their pairs must not feed the repeat penalty of the new run.
           await tx.delete(matchPairs).where(eq(matchPairs.matchRunId, old.id));
+          // Undelivered notifications describe groups that no longer exist;
+          // cancel them so an SMTP backlog can't send stale assignments
+          // alongside the update. ('sending' rows are mid-flight for ≤10s;
+          // the dispatcher's final status write wins there either way.)
+          await tx
+            .update(notifications)
+            .set({ status: "cancelled" })
+            .where(
+              and(
+                like(notifications.dedupeKey, `match:${old.id}:%`),
+                eq(notifications.status, "pending"),
+              ),
+            );
           superseded = true;
         }
       }

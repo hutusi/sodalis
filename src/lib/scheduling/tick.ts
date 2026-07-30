@@ -1,10 +1,10 @@
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { cities, notifications, offices } from "@/db/schema";
+import { cities, matchRuns, notifications, offices } from "@/db/schema";
 import { env } from "@/env";
 import { isWorkingDay } from "../calendar";
-import { runMatch } from "../matching/run";
+import { LIVE_STATUSES, runMatch } from "../matching/run";
 import { getActiveActivities, loadHolidayMap } from "../queries";
 import { composeLocalTime, localDateFor } from "../time";
 import { materializeStanding } from "./materialize";
@@ -66,20 +66,49 @@ export async function schedulerTick(now: Date = new Date()): Promise<void> {
           );
         }
       } else if (now.getTime() <= closeAt.getTime() + catchUpMs) {
-        const result = await runMatch({
-          officeId: office.officeId,
-          activityTypeId: activity.id,
-          date: localDate,
-          trigger: "scheduler",
-        });
-        if (result.outcome === "completed") {
-          console.log(
-            `[tick] matched ${office.officeName} ${activity.key} ${localDate} → run ${result.runId}`,
+        // Downtime catch-up: if the worker was offline across close, this
+        // day's standing signups were never materialized. Do it now, but
+        // only when no live run exists yet — materializing after a
+        // completed run would strand active signups that never match.
+        const [liveRun] = await db
+          .select({ id: matchRuns.id })
+          .from(matchRuns)
+          .where(
+            and(
+              eq(matchRuns.officeId, office.officeId),
+              eq(matchRuns.activityTypeId, activity.id),
+              eq(matchRuns.date, localDate),
+              inArray(matchRuns.status, [...LIVE_STATUSES]),
+            ),
+          )
+          .limit(1);
+        if (!liveRun) {
+          const created = await materializeStanding(
+            office.officeId,
+            activity.id,
+            localDate,
+            holidays,
           );
-        } else if (result.outcome === "failed") {
-          console.error(
-            `[tick] match FAILED for ${office.officeName} ${activity.key} ${localDate}: ${result.error}`,
-          );
+          if (created > 0) {
+            console.log(
+              `[tick] catch-up materialized ${created} standing signup(s) for ${office.officeName} ${activity.key} ${localDate}`,
+            );
+          }
+          const result = await runMatch({
+            officeId: office.officeId,
+            activityTypeId: activity.id,
+            date: localDate,
+            trigger: "scheduler",
+          });
+          if (result.outcome === "completed") {
+            console.log(
+              `[tick] matched ${office.officeName} ${activity.key} ${localDate} → run ${result.runId}`,
+            );
+          } else if (result.outcome === "failed") {
+            console.error(
+              `[tick] match FAILED for ${office.officeName} ${activity.key} ${localDate}: ${result.error}`,
+            );
+          }
         }
       }
 
