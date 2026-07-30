@@ -199,6 +199,7 @@ export const signups = pgTable(
     source: signupSourceEnum("source").notNull().default("manual"),
     standingSignupId: uuid("standing_signup_id").references(
       () => standingSignups.id,
+      { onDelete: "set null" },
     ),
     // A 'cancelled' row deliberately blocks re-materialization from a
     // standing signup for that day (enforced by the unique index below).
