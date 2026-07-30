@@ -11,12 +11,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { GroupCard } from "@/components/group-card";
 import { dayOffReason, nextWorkingDays } from "@/lib/calendar";
 import { formatDateLabel } from "@/lib/format";
 import {
   getOfficeContext,
   getPrimaryActivity,
+  getUserGroupForDate,
   getUserSignups,
+  hasCompletedRun,
   loadHolidayMap,
 } from "@/lib/queries";
 import {
@@ -127,6 +130,18 @@ export default async function DashboardPage() {
   const offReason = dayOffReason(today, holidays);
   const todaySignup = byDate.get(today);
 
+  // After close: either the user's group, an apology (run done, no group),
+  // or a "matching in progress" notice while the run hasn't landed yet.
+  const signedUpToday = todaySignup?.status === "active";
+  const todayGroup =
+    !todayOpen && signedUpToday
+      ? await getUserGroupForDate(user.id, activity.id, today)
+      : null;
+  const todayRunDone =
+    !todayOpen && signedUpToday && !todayGroup
+      ? await hasCompletedRun(user.officeId, activity.id, today)
+      : false;
+
   const labels = {
     join: t("join"),
     leave: t("leave"),
@@ -175,7 +190,27 @@ export default async function DashboardPage() {
             />
           </CardContent>
         ) : null}
-        {/* Matched group card lands in M6. */}
+        {todayGroup ? (
+          <CardContent className="flex flex-col gap-2">
+            <h2 className="text-sm font-medium">{t("matched")}</h2>
+            <GroupCard
+              group={todayGroup}
+              eventTime={activity.eventTime}
+              selfId={user.id}
+            />
+          </CardContent>
+        ) : null}
+        {!todayGroup && !todayOpen && signedUpToday ? (
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {todayRunDone
+                ? t("unmatchedToday")
+                : t("matching", {
+                    time: formatWallTime(activity.notifyByTime),
+                  })}
+            </p>
+          </CardContent>
+        ) : null}
       </Card>
 
       <Card>

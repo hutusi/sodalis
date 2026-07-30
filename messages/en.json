@@ -55,6 +55,7 @@
     "hostHint": "Light duty: create the group chat and pick a time everyone can make. That's it.",
     "upcoming": "Upcoming days",
     "matched": "Your lunch group",
+    "matching": "Matching in progress — results by {time}",
     "noOffice": "Pick your office in Profile before signing up.",
     "unmatchedToday": "We couldn't find you a group today — sorry! You're first in line next time."
   },
