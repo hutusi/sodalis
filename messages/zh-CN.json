@@ -1,0 +1,165 @@
+{
+  "common": {
+    "appName": "随机午餐",
+    "tagline": "一顿午饭，认识一位新同事",
+    "nav": {
+      "dashboard": "首页",
+      "standing": "定期报名",
+      "history": "饭搭子",
+      "profile": "个人设置",
+      "admin": "管理后台"
+    },
+    "signOut": "退出登录",
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "add": "添加",
+    "confirm": "确认",
+    "loading": "加载中…",
+    "saved": "已保存",
+    "yes": "是",
+    "no": "否",
+    "none": "—",
+    "language": "语言"
+  },
+  "login": {
+    "title": "登录随机午餐",
+    "subtitle": "随机匹配午餐搭子，认识团队之外的同事。",
+    "sso": "使用公司 SSO 登录",
+    "ldapToggle": "使用账号密码登录",
+    "username": "用户名",
+    "password": "密码",
+    "ldapSubmit": "登录",
+    "devTitle": "开发登录",
+    "devEmail": "种子用户邮箱",
+    "devSubmit": "以该用户登录",
+    "error": "登录失败，请检查账号密码后重试。"
+  },
+  "dashboard": {
+    "title": "首页",
+    "today": "今天",
+    "signupOpen": "报名截止 {time}",
+    "signupClosed": "已于 {time} 截止报名",
+    "notWorkingDay": "今天不安排活动（{reason}）",
+    "holiday": "法定节假日",
+    "weekend": "周末",
+    "signedUp": "已报名 {date} 的{activity}",
+    "notSignedUp": "尚未报名",
+    "join": "报名参加",
+    "leave": "取消报名",
+    "sizePref": "分组人数",
+    "sizePairOnly": "只想两人组",
+    "sizeFlex": "2–4 人都可以",
+    "willingToHost": "愿意当搭主",
+    "hostHint": "搭主职责很轻：拉个群、定个大家都方便的时间，仅此而已。",
+    "upcoming": "近期报名",
+    "matched": "你的午餐小组",
+    "noOffice": "请先在「个人设置」中选择办公区，然后再报名。",
+    "unmatchedToday": "今天没能帮你匹配到小组，抱歉！下次优先安排你。"
+  },
+  "group": {
+    "host": "搭主",
+    "hostless": "今天没有搭主，大家自行组织吧！",
+    "venue": "推荐餐厅",
+    "venueHint": "仅供参考，小组可以随意换地方。",
+    "eventTime": "时间",
+    "members": "成员",
+    "contactHidden": "未公开联系方式",
+    "department": "部门"
+  },
+  "standing": {
+    "title": "定期报名",
+    "subtitle": "在选中的工作日自动帮你报名。法定节假日自动跳过；调休上班的周六仅在你勾选了全部工作日时生效。",
+    "weekdays": "自动报名日",
+    "mon": "周一",
+    "tue": "周二",
+    "wed": "周三",
+    "thu": "周四",
+    "fri": "周五",
+    "paused": "已暂停",
+    "pause": "暂停",
+    "resume": "恢复",
+    "notConfigured": "还没有设置定期报名。",
+    "remove": "删除定期报名"
+  },
+  "history": {
+    "title": "饭搭子",
+    "empty": "还没有午餐记录，快去报名认识新同事吧！",
+    "metOn": "{date} 的午餐",
+    "timesMet": "{count, plural, other {一起吃过 # 次}}"
+  },
+  "profile": {
+    "title": "个人设置",
+    "name": "姓名",
+    "email": "邮箱",
+    "department": "部门",
+    "departmentHint": "登录时自动同步自公司目录。",
+    "office": "办公区",
+    "officeHint": "匹配在同一办公区内进行。",
+    "selectOffice": "选择办公区…",
+    "language": "语言",
+    "contact": "联系方式",
+    "contactPlaceholder": "展示给午餐小组的电话 / IM",
+    "contactVisible": "向匹配到的同事展示我的联系方式"
+  },
+  "admin": {
+    "title": "管理后台",
+    "nav": {
+      "overview": "总览",
+      "org": "组织与餐厅",
+      "activities": "活动类型",
+      "holidays": "节假日",
+      "runs": "匹配记录"
+    },
+    "org": {
+      "cities": "城市",
+      "offices": "办公区",
+      "cafeterias": "餐厅",
+      "nameEn": "名称（英文）",
+      "nameZh": "名称（中文）",
+      "timezone": "时区",
+      "city": "城市",
+      "office": "办公区",
+      "active": "启用"
+    },
+    "activities": {
+      "title": "活动类型",
+      "key": "标识",
+      "close": "报名截止",
+      "notifyBy": "通知截止",
+      "eventAt": "活动时间"
+    },
+    "holidays": {
+      "title": "节假日安排",
+      "subtitle": "标记为「节假日」的日期不做匹配；「调休上班」的周末日期正常匹配。",
+      "date": "日期",
+      "kind": "类型",
+      "holiday": "节假日",
+      "workday": "调休上班",
+      "label": "说明",
+      "addDay": "添加日期"
+    },
+    "runs": {
+      "title": "匹配记录",
+      "date": "日期",
+      "office": "办公区",
+      "status": "状态",
+      "groups": "小组数",
+      "pool": "报名数",
+      "unmatched": "未匹配",
+      "rerun": "重新匹配",
+      "rerunHint": "会覆盖当前结果，并通知受影响的同事。",
+      "seed": "随机种子",
+      "trigger": "触发方式",
+      "notifications": "通知",
+      "noRuns": "暂无匹配记录。"
+    },
+    "overview": {
+      "signupsToday": "今日报名",
+      "runsToday": "今日匹配",
+      "pendingNotifications": "待发送通知",
+      "failedNotifications": "发送失败通知"
+    }
+  }
+}
