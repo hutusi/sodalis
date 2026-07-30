@@ -1,0 +1,12 @@
+# Keep the build context small and — critically — keep secrets out of it:
+# the build stage COPYs the whole context, so anything here would end up
+# in an image layer.
+.git
+node_modules
+.next
+out
+coverage
+*.log
+.DS_Store
+**/.env*
+!.env.example

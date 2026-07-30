@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 
 import { db } from "@/db";
