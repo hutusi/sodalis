@@ -77,6 +77,10 @@ export async function dispatchOutbox(now: Date = new Date()): Promise<number> {
   for (const row of claimed) {
     const notifier = notifiers[row.channel];
     const attempt = row.attempts + 1;
+    // Every transition below is compare-and-set on status='sending': a run
+    // superseded mid-flight marks the row 'cancelled', and neither the
+    // success nor the failure path may resurrect it (a cancelled row must
+    // never be retried, and crash-reclaim only ever selects 'sending').
     try {
       await notifier.send({
         to: row.email,
@@ -86,7 +90,12 @@ export async function dispatchOutbox(now: Date = new Date()): Promise<number> {
       await db
         .update(notifications)
         .set({ status: "sent", sentAt: new Date() })
-        .where(eq(notifications.id, row.id));
+        .where(
+          and(
+            eq(notifications.id, row.id),
+            eq(notifications.status, "sending"),
+          ),
+        );
       sent++;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -98,7 +107,12 @@ export async function dispatchOutbox(now: Date = new Date()): Promise<number> {
           lastError: message,
           nextAttemptAt: new Date(now.getTime() + 2 ** attempt * 60_000),
         })
-        .where(eq(notifications.id, row.id));
+        .where(
+          and(
+            eq(notifications.id, row.id),
+            eq(notifications.status, "sending"),
+          ),
+        );
       console.error(
         `[outbox] send failed (attempt ${attempt}${exhausted ? ", giving up" : ""}): ${message}`,
       );

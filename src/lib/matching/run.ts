@@ -13,7 +13,9 @@ import {
   signups,
   users,
 } from "@/db/schema";
+import type { HolidayMap } from "../calendar";
 import type { NotificationPayload } from "../notify/types";
+import { materializeStanding } from "../scheduling/materialize";
 import { addDays, type LocalDate } from "../time";
 import { matchEngine, type HostStats } from "./engine";
 import { matchAdvisoryLock } from "./lock";
@@ -32,6 +34,13 @@ export type RunMatchOptions = {
   date: LocalDate;
   trigger: "scheduler" | "manual";
   triggeredByUserId?: string;
+  /**
+   * Catch-up recovery (scheduler only): materialize standing signups inside
+   * this run's locked transaction, atomically with the pool snapshot — a
+   * concurrent run can't slip between materialization and matching. Only
+   * rules unchanged since `updatedBefore` (the close instant) apply.
+   */
+  catchUpMaterialize?: { holidays: HolidayMap; updatedBefore: Date };
 };
 
 export type RunMatchResult =
@@ -74,16 +83,18 @@ export async function runMatch(opts: RunMatchOptions): Promise<RunMatchResult> {
           // Their pairs must not feed the repeat penalty of the new run.
           await tx.delete(matchPairs).where(eq(matchPairs.matchRunId, old.id));
           // Undelivered notifications describe groups that no longer exist;
-          // cancel them so an SMTP backlog can't send stale assignments
-          // alongside the update. ('sending' rows are mid-flight for ≤10s;
-          // the dispatcher's final status write wins there either way.)
+          // cancel them so no retry or crash-reclaim path can deliver stale
+          // assignments. 'sending' rows are cancelled too: if SMTP already
+          // accepted one, delivery is unavoidable, but the dispatcher's
+          // compare-and-set transitions (WHERE status='sending') mean a
+          // cancelled row is never resurrected to pending or re-sent.
           await tx
             .update(notifications)
             .set({ status: "cancelled" })
             .where(
               and(
                 like(notifications.dedupeKey, `match:${old.id}:%`),
-                eq(notifications.status, "pending"),
+                inArray(notifications.status, ["pending", "sending"]),
               ),
             );
           superseded = true;
@@ -111,6 +122,22 @@ export async function runMatch(opts: RunMatchOptions): Promise<RunMatchResult> {
           startedAt: new Date(),
         })
         .returning();
+
+      if (opts.trigger === "scheduler" && opts.catchUpMaterialize) {
+        const created = await materializeStanding(
+          tx,
+          opts.officeId,
+          opts.activityTypeId,
+          opts.date,
+          opts.catchUpMaterialize.holidays,
+          opts.catchUpMaterialize.updatedBefore,
+        );
+        if (created > 0) {
+          console.log(
+            `[match] catch-up materialized ${created} standing signup(s) for ${opts.officeId} ${opts.date}`,
+          );
+        }
+      }
 
       // ---- Load engine inputs ------------------------------------------
       const pool: PoolMember[] = await tx

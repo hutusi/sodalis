@@ -11,3 +11,5 @@ const client = postgres(env.DATABASE_URL, { max: 10 });
 export const db = drizzle(client, { schema });
 
 export type Db = typeof db;
+/** Either the pool client or a transaction — for helpers usable in both. */
+export type DbClient = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];

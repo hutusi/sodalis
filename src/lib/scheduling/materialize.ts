@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 
-import { db } from "@/db";
+import type { DbClient } from "@/db";
 import { signups, standingSignups, users } from "@/db/schema";
 import { isMakeupWorkday, type HolidayMap } from "../calendar";
 import { isoWeekday, type LocalDate } from "../time";
@@ -30,14 +30,20 @@ export function standingAppliesOn(
  * one office × activity × date. Runs every tick until close and is fully
  * idempotent: the (user, activity, date) unique key makes re-inserts
  * no-ops, and a user-cancelled row blocks resurrection outright.
+ *
+ * `updatedBefore` (catch-up recovery): only rules already in their current
+ * state at that instant apply — a rule created or edited after close must
+ * not slip into that day's match through worker downtime.
  */
 export async function materializeStanding(
+  dbx: DbClient,
   officeId: string,
   activityTypeId: string,
   date: LocalDate,
   holidays: HolidayMap,
+  updatedBefore?: Date,
 ): Promise<number> {
-  const rows = await db
+  const rows = await dbx
     .select({
       id: standingSignups.id,
       userId: standingSignups.userId,
@@ -52,6 +58,7 @@ export async function materializeStanding(
         eq(users.officeId, officeId),
         eq(standingSignups.activityTypeId, activityTypeId),
         eq(standingSignups.isPaused, false),
+        updatedBefore ? lte(standingSignups.updatedAt, updatedBefore) : undefined,
       ),
     );
 
@@ -60,7 +67,7 @@ export async function materializeStanding(
   );
   if (applicable.length === 0) return 0;
 
-  const inserted = await db
+  const inserted = await dbx
     .insert(signups)
     .values(
       applicable.map((r) => ({

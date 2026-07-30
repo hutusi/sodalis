@@ -46,11 +46,14 @@ const COPY = {
   },
 } satisfies Record<Locale, Record<string, unknown>>;
 
+// Quotes included: esc() output also lands in attribute values (mailto href).
 function esc(s: string): string {
   return s
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 export function renderNotification(

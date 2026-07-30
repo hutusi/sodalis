@@ -1,13 +1,16 @@
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, lt } from "drizzle-orm";
 
 import { db } from "@/db";
-import { cities, matchRuns, notifications, offices } from "@/db/schema";
+import { cities, notifications, offices } from "@/db/schema";
 import { env } from "@/env";
 import { isWorkingDay } from "../calendar";
-import { LIVE_STATUSES, runMatch } from "../matching/run";
+import { runMatch } from "../matching/run";
 import { getActiveActivities, loadHolidayMap } from "../queries";
 import { composeLocalTime, localDateFor } from "../time";
 import { materializeStanding } from "./materialize";
+
+/** Pending notifications older than this trigger the delivery-lag warning. */
+const SLA_LAG_MS = 15 * 60_000;
 
 /**
  * One scheduler pass, safe to run every 30 seconds. All work is derived
@@ -16,11 +19,11 @@ import { materializeStanding } from "./materialize";
  * not in scheduler memory:
  *
  *  before close            → materialize standing signups (idempotent)
- *  close … close + window  → trigger matching (no-op if a live run exists,
- *                            which is also what makes downtime catch-up
- *                            just work: a restart inside the window fires
- *                            immediately, after it the day is skipped)
- *  after notify-by         → log an SLA warning if notifications lag
+ *  close … close + window  → trigger matching; the run materializes any
+ *                            missed standing signups inside its own locked
+ *                            transaction (downtime catch-up), restricted to
+ *                            rules unchanged since close, and no-ops when a
+ *                            live run already exists
  */
 export async function schedulerTick(now: Date = new Date()): Promise<void> {
   const officeRows = await db
@@ -55,6 +58,7 @@ export async function schedulerTick(now: Date = new Date()): Promise<void> {
 
       if (now.getTime() < closeAt.getTime()) {
         const created = await materializeStanding(
+          db,
           office.officeId,
           activity.id,
           localDate,
@@ -66,68 +70,40 @@ export async function schedulerTick(now: Date = new Date()): Promise<void> {
           );
         }
       } else if (now.getTime() <= closeAt.getTime() + catchUpMs) {
-        // Downtime catch-up: if the worker was offline across close, this
-        // day's standing signups were never materialized. Do it now, but
-        // only when no live run exists yet — materializing after a
-        // completed run would strand active signups that never match.
-        const [liveRun] = await db
-          .select({ id: matchRuns.id })
-          .from(matchRuns)
-          .where(
-            and(
-              eq(matchRuns.officeId, office.officeId),
-              eq(matchRuns.activityTypeId, activity.id),
-              eq(matchRuns.date, localDate),
-              inArray(matchRuns.status, [...LIVE_STATUSES]),
-            ),
-          )
-          .limit(1);
-        if (!liveRun) {
-          const created = await materializeStanding(
-            office.officeId,
-            activity.id,
-            localDate,
-            holidays,
+        const result = await runMatch({
+          officeId: office.officeId,
+          activityTypeId: activity.id,
+          date: localDate,
+          trigger: "scheduler",
+          catchUpMaterialize: { holidays, updatedBefore: closeAt },
+        });
+        if (result.outcome === "completed") {
+          console.log(
+            `[tick] matched ${office.officeName} ${activity.key} ${localDate} → run ${result.runId}`,
           );
-          if (created > 0) {
-            console.log(
-              `[tick] catch-up materialized ${created} standing signup(s) for ${office.officeName} ${activity.key} ${localDate}`,
-            );
-          }
-          const result = await runMatch({
-            officeId: office.officeId,
-            activityTypeId: activity.id,
-            date: localDate,
-            trigger: "scheduler",
-          });
-          if (result.outcome === "completed") {
-            console.log(
-              `[tick] matched ${office.officeName} ${activity.key} ${localDate} → run ${result.runId}`,
-            );
-          } else if (result.outcome === "failed") {
-            console.error(
-              `[tick] match FAILED for ${office.officeName} ${activity.key} ${localDate}: ${result.error}`,
-            );
-          }
-        }
-      }
-
-      const notifyBy = composeLocalTime(
-        localDate,
-        activity.notifyByTime,
-        office.timezone,
-      );
-      if (now.getTime() > notifyBy.getTime()) {
-        const [{ value: pending }] = await db
-          .select({ value: count() })
-          .from(notifications)
-          .where(eq(notifications.status, "pending"));
-        if (pending > 0) {
-          console.warn(
-            `[tick] SLA: ${pending} notification(s) still pending after ${activity.notifyByTime}`,
+        } else if (result.outcome === "failed") {
+          console.error(
+            `[tick] match FAILED for ${office.officeName} ${activity.key} ${localDate}: ${result.error}`,
           );
         }
       }
     }
+  }
+
+  // Delivery-lag warning, once per tick (not per office×activity): pending
+  // rows that have sat longer than the SLA lag mean SMTP is down or slow.
+  const [{ value: lagging }] = await db
+    .select({ value: count() })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.status, "pending"),
+        lt(notifications.createdAt, new Date(now.getTime() - SLA_LAG_MS)),
+      ),
+    );
+  if (lagging > 0) {
+    console.warn(
+      `[tick] SLA: ${lagging} notification(s) pending for more than ${SLA_LAG_MS / 60_000} minutes`,
+    );
   }
 }

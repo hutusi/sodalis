@@ -81,4 +81,24 @@ describe("renderNotification", () => {
     expect(r.html).not.toContain("<script>");
     expect(r.html).toContain("&lt;script&gt;");
   });
+
+  test("html escapes quotes so attribute context cannot be broken", () => {
+    const evil = {
+      ...base,
+      group: {
+        ...base.group!,
+        members: [
+          {
+            ...base.group!.members[0],
+            email: 'x" onmouseover="alert(1)@corp.example.com',
+            department: "it's \"quoted\"",
+          },
+        ],
+      },
+    };
+    const r = renderNotification(evil, "zh-CN");
+    expect(r.html).not.toContain('x" onmouseover');
+    expect(r.html).toContain("&quot;");
+    expect(r.html).toContain("&#39;");
+  });
 });
