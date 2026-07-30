@@ -35,10 +35,17 @@ export type RunMatchOptions = {
   trigger: "scheduler" | "manual";
   triggeredByUserId?: string;
   /**
-   * Catch-up recovery (scheduler only): materialize standing signups inside
-   * this run's locked transaction, atomically with the pool snapshot — a
-   * concurrent run can't slip between materialization and matching. Only
-   * rules unchanged since `updatedBefore` (the close instant) apply.
+   * Materialize standing signups inside this run's locked transaction,
+   * atomically with the pool snapshot — a concurrent run can't slip between
+   * materialization and matching. Only rules unchanged since `updatedBefore`
+   * (the close instant) apply: without rule history we cannot reconstruct
+   * close-time state, so an after-close edit excludes the rule for that day
+   * (fails safe) and users are materialized into their *current* office
+   * (no duplication — user×activity×date is unique — and no race, since
+   * the insert happens under this office's own lock). Passed by both the
+   * scheduler's catch-up window and the admin re-run, so a failed catch-up
+   * remains recoverable manually; on healthy re-runs it no-ops via the
+   * unique key.
    */
   catchUpMaterialize?: { holidays: HolidayMap; updatedBefore: Date };
 };
@@ -123,7 +130,7 @@ export async function runMatch(opts: RunMatchOptions): Promise<RunMatchResult> {
         })
         .returning();
 
-      if (opts.trigger === "scheduler" && opts.catchUpMaterialize) {
+      if (opts.catchUpMaterialize) {
         const created = await materializeStanding(
           tx,
           opts.officeId,

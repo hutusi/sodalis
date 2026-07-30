@@ -6,6 +6,7 @@ const none: AdminState = { isAdmin: false, adminVia: null };
 const manual: AdminState = { isAdmin: true, adminVia: "manual" };
 const viaEnv: AdminState = { isAdmin: true, adminVia: "env" };
 const viaGroup: AdminState = { isAdmin: true, adminVia: "group" };
+const unknown: AdminState = { isAdmin: true, adminVia: null };
 
 const EMAILS = new Set(["boss@corp.example.com"]);
 const NO_EMAILS = new Set<string>();
@@ -40,7 +41,8 @@ describe("computeAdmin", () => {
     );
   });
 
-  test("group removal revokes only on logins that carry group info", () => {
+  test("group grants require reaffirmation: any unconfirming login revokes", () => {
+    // OIDC login, no longer in the group.
     expect(
       computeAdmin(
         { groupsKnown: true, adminByGroup: false },
@@ -49,19 +51,26 @@ describe("computeAdmin", () => {
         NO_EMAILS,
       ),
     ).toEqual(none);
-    // LDAP/dev login: no group info → grant survives.
+    // LDAP login (no group signal): also revokes — otherwise a removed
+    // admin could dodge revocation forever by only using LDAP.
+    expect(computeAdmin({}, "a@corp.example.com", viaGroup, NO_EMAILS)).toEqual(
+      none,
+    );
+    // Reaffirming OIDC login keeps it.
     expect(
-      computeAdmin({}, "a@corp.example.com", viaGroup, NO_EMAILS),
+      computeAdmin(
+        { groupsKnown: true, adminByGroup: true },
+        "a@corp.example.com",
+        viaGroup,
+        NO_EMAILS,
+      ),
     ).toEqual(viaGroup);
   });
 
   test("manual grants are sticky against every login signal", () => {
-    // Present in env list: provenance must NOT flip to env (which would
-    // make the manual grant revocable by later env-list removal).
     expect(computeAdmin({}, "boss@corp.example.com", manual, EMAILS)).toEqual(
       manual,
     );
-    // In the IdP group: same.
     expect(
       computeAdmin(
         { groupsKnown: true, adminByGroup: true },
@@ -70,7 +79,6 @@ describe("computeAdmin", () => {
         NO_EMAILS,
       ),
     ).toEqual(manual);
-    // Absent from both: still admin.
     expect(
       computeAdmin(
         { groupsKnown: true, adminByGroup: false },
@@ -92,8 +100,21 @@ describe("computeAdmin", () => {
     ).toEqual(viaEnv);
   });
 
-  test("unknown provenance on an existing admin is left untouched", () => {
-    const unknown: AdminState = { isAdmin: true, adminVia: null };
+  test("unknown provenance resolves on an informative login", () => {
+    // Env-listed → classified as env (revocable by env removal later).
+    expect(
+      computeAdmin({}, "boss@corp.example.com", unknown, EMAILS),
+    ).toEqual(viaEnv);
+    // Group-confirmed → classified as group.
+    expect(
+      computeAdmin(
+        { groupsKnown: true, adminByGroup: true },
+        "a@corp.example.com",
+        unknown,
+        NO_EMAILS,
+      ),
+    ).toEqual(viaGroup);
+    // Groups checkable, backed by neither source → revoked.
     expect(
       computeAdmin(
         { groupsKnown: true, adminByGroup: false },
@@ -101,6 +122,13 @@ describe("computeAdmin", () => {
         unknown,
         NO_EMAILS,
       ),
-    ).toEqual(unknown);
+    ).toEqual(none);
+  });
+
+  test("unknown provenance survives an uninformative login", () => {
+    // LDAP login, not env-listed, groups unknowable → cannot judge, keep.
+    expect(computeAdmin({}, "a@corp.example.com", unknown, NO_EMAILS)).toEqual(
+      unknown,
+    );
   });
 });

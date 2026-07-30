@@ -39,6 +39,11 @@ bun run worker             # scheduler + outbox, in a second terminal
 bun run check              # tsc + eslint + bun test — the gate for every commit
 ```
 
+Concurrency and recovery behavior that `bun test` can't cover (it needs a
+live Postgres) is verified by runnable checks in `scripts/verify/` — e.g.
+`bun run scripts/verify/outbox-cancel-mid-batch.ts` — each exits non-zero
+on failure.
+
 To watch a full matching cycle locally: set the lunch activity's close time
 a few minutes ahead in `/admin/activities`, sign a few demo users up on the
 dashboard, and keep `bun run worker` running with `SMTP_HOST=localhost

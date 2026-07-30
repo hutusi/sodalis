@@ -77,6 +77,16 @@ export async function dispatchOutbox(now: Date = new Date()): Promise<number> {
   for (const row of claimed) {
     const notifier = notifiers[row.channel];
     const attempt = row.attempts + 1;
+    // The batch was claimed up front, but a supersede may cancel rows while
+    // earlier ones are on the wire — re-read just before sending so a
+    // cancelled row is skipped, not delivered. The remaining window (cancel
+    // landing between this read and SMTP accepting the message) is a single
+    // send's round-trip and irreducible without transactional email.
+    const [fresh] = await db
+      .select({ status: notifications.status })
+      .from(notifications)
+      .where(eq(notifications.id, row.id));
+    if (fresh?.status !== "sending") continue;
     // Every transition below is compare-and-set on status='sending': a run
     // superseded mid-flight marks the row 'cancelled', and neither the
     // success nor the failure path may resurrect it (a cancelled row must

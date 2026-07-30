@@ -126,13 +126,16 @@ async function seedDemoUsers(officeIds: string[]) {
         department,
         officeId: officeIds[officeIdx],
         locale: "zh-CN",
-        // First demo user doubles as an admin for local admin-UI work.
-        // 'manual' provenance: logins never auto-revoke it.
-        isAdmin: local === "wang.wei",
-        adminVia: local === "wang.wei" ? ("manual" as const) : null,
       })
       .onConflictDoNothing({ target: users.email });
   }
+  // First demo user doubles as an admin for local admin-UI work. Explicit
+  // update (not just insert values): migration 0004 clears backfilled
+  // provenance, so re-seeding an existing dev DB must restore the grant.
+  await db
+    .update(users)
+    .set({ isAdmin: true, adminVia: "manual" })
+    .where(eq(users.email, "wang.wei@corp.example.com"));
 }
 
 if (import.meta.main) {
