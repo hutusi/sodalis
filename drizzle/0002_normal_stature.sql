@@ -1,5 +1,8 @@
 CREATE TYPE "public"."admin_via" AS ENUM('manual', 'env', 'group');--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "admin_via" "admin_via";--> statement-breakpoint
--- Backfill: pre-existing admins were granted before provenance tracking;
--- treat them as manual so logins never auto-revoke them.
-UPDATE "users" SET "admin_via" = 'manual' WHERE "is_admin" = true;
+ALTER TABLE "users" ADD COLUMN "admin_via" "admin_via";
+-- Deliberately no backfill: NULL means "unknown provenance", which
+-- computeAdmin resolves on the next informative login (env-listed → env,
+-- group-confirmed → group, neither → revoked). A migration cannot know
+-- which grants were manual, and guessing either way is worse: 'manual'
+-- makes external grants unrevocable, revoking risks locking out real
+-- manual admins.

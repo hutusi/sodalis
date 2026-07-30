@@ -39,7 +39,8 @@ export type RunMatchOptions = {
    * atomically with the pool snapshot — a concurrent run can't slip between
    * materialization and matching. Only rules unchanged since `updatedBefore`
    * (the close instant) apply: without rule history we cannot reconstruct
-   * close-time state, so an after-close edit excludes the rule for that day
+   * close-time state (tracked: https://github.com/hutusi/sodalis/issues/2),
+   * so an after-close edit excludes the rule for that day
    * (fails safe) and users are materialized into their *current* office
    * (no duplication — user×activity×date is unique — and no race, since
    * the insert happens under this office's own lock). Passed by both the
