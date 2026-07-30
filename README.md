@@ -42,7 +42,8 @@ bun run check              # tsc + eslint + bun test — the gate for every comm
 Concurrency and recovery behavior that `bun test` can't cover (it needs a
 live Postgres) is verified by runnable checks in `scripts/verify/` — e.g.
 `bun run scripts/verify/outbox-cancel-mid-batch.ts` — each exits non-zero
-on failure.
+on failure. The outbox check creates a throwaway database and needs the
+`CREATEDB` privilege once: `ALTER ROLE sodalis CREATEDB`.
 
 To watch a full matching cycle locally: set the lunch activity's close time
 a few minutes ahead in `/admin/activities`, sign a few demo users up on the
