@@ -15,5 +15,11 @@ services:
       timeout: 3s
       retries: 10
 
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025" # SMTP — point SMTP_HOST=localhost SMTP_PORT=1025 at it
+      - "8025:8025" # Web UI
+
 volumes:
   pgdata-dev:

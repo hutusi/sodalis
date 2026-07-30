@@ -2,6 +2,7 @@ import { Cron } from "croner";
 import postgres from "postgres";
 
 import { env } from "@/env";
+import { dispatchOutbox } from "@/lib/notify/outbox";
 import { schedulerTick } from "@/lib/scheduling/tick";
 
 // One arbitrary-but-fixed id: only a single worker may run loops at a time.
@@ -35,6 +36,17 @@ jobs.push(
       await schedulerTick();
     } catch (error) {
       console.error("[worker] tick failed:", error);
+    }
+  }),
+);
+
+jobs.push(
+  new Cron("*/10 * * * * *", { protect: true }, async () => {
+    try {
+      const sent = await dispatchOutbox();
+      if (sent > 0) console.log(`[worker] outbox: sent ${sent}`);
+    } catch (error) {
+      console.error("[worker] outbox pass failed:", error);
     }
   }),
 );
