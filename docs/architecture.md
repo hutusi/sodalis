@@ -2,7 +2,7 @@
 
 One Postgres database, two processes built from one codebase:
 
-```
+```text
 ┌──────────────────────────┐     ┌──────────────────────┐
 │  Next.js app             │     │  Worker (Bun)        │
 │  src/app, components,    │     │  30s scheduler tick  │
