@@ -3,8 +3,10 @@
 #   worker — scheduler + outbox, Bun executing TypeScript directly
 # Build from the repo root:  docker build -f docker/Dockerfile --target app .
 
+# Bun version pinned to match .bun-version (CI reads that file directly;
+# update both together).
 FROM node:22-slim AS base
-COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=oven/bun:1.3.14 /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 COPY package.json bun.lock ./
 # Full install (incl. dev deps): the worker image also serves as the
@@ -27,7 +29,7 @@ USER node
 EXPOSE 3000
 CMD ["node", "server.js"]
 
-FROM oven/bun:1-slim AS worker
+FROM oven/bun:1.3.14-slim AS worker
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=base --chown=bun:bun /app/node_modules ./node_modules

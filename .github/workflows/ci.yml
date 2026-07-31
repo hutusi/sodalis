@@ -9,11 +9,12 @@ jobs:
   check:
     name: Typecheck · Lint · Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun run lint
@@ -25,6 +26,8 @@ jobs:
   integration:
     name: DB integration checks
     runs-on: ubuntu-latest
+    # Advisory-lock tests could hang on a deadlock regression — bound them.
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine
@@ -43,10 +46,10 @@ jobs:
       DATABASE_URL: postgres://sodalis:sodalis@localhost:5432/sodalis
       PGPASSWORD: sodalis
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
       - run: bun run db:migrate
       - run: bun run seed --demo
@@ -63,17 +66,23 @@ jobs:
           cat worker.log
           grep -q "lock acquired" worker.log
           kill -TERM $WORKER_PID
-          wait $WORKER_PID || true
+          # Bounded shutdown: SIGKILL if graceful exit regresses.
+          for i in $(seq 1 10); do
+            kill -0 $WORKER_PID 2>/dev/null || break
+            sleep 1
+          done
+          kill -9 $WORKER_PID 2>/dev/null || true
           grep -q "shutting down" worker.log
 
   build:
     name: Next build · Docker images
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
       - run: bun run build
       - name: Docker build (app target)

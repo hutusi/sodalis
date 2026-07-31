@@ -3,20 +3,23 @@
 One Postgres database, two processes built from one codebase:
 
 ```
-┌─────────────────────┐          ┌──────────────────────┐
-│  Next.js app        │          │  Worker (Bun)        │
-│  pages + server     │          │  30s scheduler tick  │
-│  actions, admin     │          │  10s outbox dispatch │
-└─────────┬───────────┘          └──────────┬───────────┘
+┌──────────────────────────┐     ┌──────────────────────┐
+│  Next.js app             │     │  Worker (Bun)        │
+│  src/app, components,    │     │  30s scheduler tick  │
+│  auth, i18n              │     │  10s outbox dispatch │
+└─────────┬────────────────┘     └──────────┬───────────┘
           │        src/lib, src/db          │
           └───────────► PostgreSQL ◄────────┘
 ```
 
-- `src/app` — pages and server actions (the only place Next/React may live).
-- `src/lib`, `src/db`, `src/worker` — **framework-free core**: an ESLint rule
-  forbids importing `next/*` or `react` there, because the worker executes
-  these modules directly with Bun (`bun run src/worker/index.ts`), outside
-  the Next build. See [ADR-0002](adr/0002-framework-free-core.md).
+- `src/lib`, `src/db`, `src/worker` — the **framework-free core**: an ESLint
+  `no-restricted-imports` rule forbids `next`, `next/*`, `react` and
+  `@/app/*` there (sole exemption: `src/lib/utils.ts`), because the worker
+  executes these modules directly with Bun (`bun run src/worker/index.ts`),
+  outside the Next build. See [ADR-0002](adr/0002-framework-free-core.md).
+- Everything else — `src/app`, `src/components`, `src/auth`, `src/i18n` —
+  may freely use Next/React; the boundary is one-directional (framework
+  code imports the core, never the reverse).
 - There is no Redis, no message broker, no cron daemon: every coordination
   primitive is a Postgres feature (unique keys, advisory locks, an outbox
   table). See [ADR-0001](adr/0001-stack.md), [ADR-0003](adr/0003-db-driven-scheduler.md).

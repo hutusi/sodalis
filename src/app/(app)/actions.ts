@@ -8,8 +8,8 @@ import { requireUser } from "@/auth/session";
 import { db } from "@/db";
 import { activityTypes, signups } from "@/db/schema";
 import { isWorkingDay } from "@/lib/calendar";
-import { matchAdvisoryLock } from "@/lib/matching/lock";
 import { getOfficeContext, loadHolidayMap } from "@/lib/queries";
+import { cancelSignupTx, upsertSignupTx } from "@/lib/signup";
 import { composeLocalTime, localDateFor } from "@/lib/time";
 
 // The regex alone accepts impossible dates like 2026-02-30, which JS Date
@@ -99,36 +99,19 @@ export async function upsertSignup(formData: FormData) {
     { requireWorkingDay: true },
   );
 
-  await db.transaction(async (tx) => {
-    await tx.execute(
-      matchAdvisoryLock(targetOfficeId, input.activityTypeId, input.date),
-    );
-    // Zero queries between lock and write. If we blocked behind the matcher,
-    // the wall clock is necessarily past close by the time we resume.
-    if (Date.now() >= closeAt.getTime()) throw new Error("signup closed");
-
-    await tx
-      .insert(signups)
-      .values({
-        userId: user.id,
-        activityTypeId: input.activityTypeId,
-        officeId: targetOfficeId,
-        date: input.date,
-        groupSizePref: input.sizePref,
-        willingToHost: input.willingToHost,
-        source: "manual",
-        status: "active",
-      })
-      .onConflictDoUpdate({
-        target: [signups.userId, signups.activityTypeId, signups.date],
-        set: {
-          groupSizePref: input.sizePref,
-          willingToHost: input.willingToHost,
-          officeId: targetOfficeId,
-          status: "active",
-        },
-      });
-  });
+  // The lock-holding transaction lives in @/lib/signup so the CI contention
+  // check exercises the exact production path.
+  await upsertSignupTx(
+    {
+      userId: user.id,
+      activityTypeId: input.activityTypeId,
+      officeId: targetOfficeId,
+      date: input.date,
+      groupSizePref: input.sizePref,
+      willingToHost: input.willingToHost,
+    },
+    closeAt,
+  );
 
   revalidatePath("/");
 }
@@ -155,19 +138,15 @@ export async function cancelSignup(formData: FormData) {
     { requireWorkingDay: false },
   );
 
-  await db.transaction(async (tx) => {
-    await tx.execute(
-      matchAdvisoryLock(existing.officeId, input.activityTypeId, input.date),
-    );
-    if (Date.now() >= closeAt.getTime()) throw new Error("signup closed");
-
-    // Kept as a 'cancelled' row (not deleted) so a standing signup cannot
-    // silently re-materialize a day the user opted out of.
-    await tx
-      .update(signups)
-      .set({ status: "cancelled" })
-      .where(eq(signups.id, existing.id));
-  });
+  await cancelSignupTx(
+    {
+      signupId: existing.id,
+      officeId: existing.officeId,
+      activityTypeId: input.activityTypeId,
+      date: input.date,
+    },
+    closeAt,
+  );
 
   revalidatePath("/");
 }

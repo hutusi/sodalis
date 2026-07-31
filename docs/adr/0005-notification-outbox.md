@@ -33,6 +33,14 @@ freshness re-read and SMTP accepting that one message still delivers it
 (the row ends `cancelled` though delivered). Eliminating it would require
 transactional email, which does not exist.
 
+**Delivery is at-least-once, accepted**: if the process crashes after SMTP
+accepts a message but before the `sent` status write, the ten-minute
+crash-reclaim re-sends it — a duplicate email. This is inherent to any
+outbox over a non-transactional transport; for email the failure mode is
+harmless (a human sees the same lunch group twice). A future channel that
+needs stronger semantics must dedupe downstream, e.g. keyed on
+`dedupe_key` at the provider.
+
 New channels (WeCom/Feishu/DingTalk) are a new `Notifier` implementation
 plus an enum value; the lifecycle is channel-agnostic.
 
