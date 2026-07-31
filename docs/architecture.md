@@ -13,10 +13,12 @@ One Postgres database, two processes built from one codebase:
 ```
 
 - `src/lib`, `src/db`, `src/worker` — the **framework-free core**: an ESLint
-  `no-restricted-imports` rule forbids `next`, `next/*`, `react` and
-  `@/app/*` there (sole exemption: `src/lib/utils.ts`), because the worker
-  executes these modules directly with Bun (`bun run src/worker/index.ts`),
-  outside the Next build. See [ADR-0002](adr/0002-framework-free-core.md).
+  `no-restricted-imports` rule forbids all framework entry points there —
+  `next`/`next/*`, `react`/`react/*`/`react-dom`, `server-only`, `@/app/*`,
+  `@/components/*` (sole exemption: `src/lib/utils.ts`; the authoritative
+  list lives in `eslint.config.mjs`) — because the worker executes these
+  modules directly with Bun (`bun run src/worker/index.ts`), outside the
+  Next build. See [ADR-0002](adr/0002-framework-free-core.md).
 - Everything else — `src/app`, `src/components`, `src/auth`, `src/i18n` —
   may freely use Next/React; the boundary is one-directional (framework
   code imports the core, never the reverse).
@@ -54,6 +56,7 @@ reproducible from their stored seed. See [ADR-0004](adr/0004-matching-engine.md)
 | One signup per user × activity × day; a cancelled day can't be re-materialized | unique key on `signups(user_id, activity_type_id, date)` + status `cancelled` rows kept, not deleted |
 | At most one live match run per office × activity × day; scheduler double-fire impossible | partial unique index on `match_runs` where status in (pending, running, completed) |
 | Signups can't race the matcher (commit after pool snapshot) | shared `pg_advisory_xact_lock(office, activity, date)`; actions re-check the deadline after acquiring it with zero pool queries inside the transaction ([ADR-0003](adr/0003-db-driven-scheduler.md)) |
+| A stale request can't mutate a row that moved to another office (whose lock it doesn't hold) | signup writes are compare-and-set against the pre-validated (office, status) — mismatches throw a retryable conflict (`src/lib/signup.ts`) |
 | No duplicate notification per run × user; re-enqueue is a no-op | unique `notifications.dedupe_key` = `match:{run}:{user}` |
 | A superseded run's undelivered emails never go out | supersede cancels pending+sending rows; every dispatcher status write is compare-and-set on `status='sending'`; per-send freshness re-read ([ADR-0005](adr/0005-notification-outbox.md)) |
 | Two workers never run loops concurrently | session advisory lock at boot + 60s self-check that exits on lock loss |

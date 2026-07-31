@@ -12,9 +12,10 @@ publishing an internal package would be heavy for one repo.
 ## Decision
 
 `src/lib`, `src/db` and `src/worker` are **framework-free**: an ESLint
-`no-restricted-imports` rule forbids `next`, `next/*`, `react`, `server-only`
-and `@/app/*` there (sole exemption: `src/lib/utils.ts`, the Tailwind `cn`
-helper). The worker executes this core directly with Bun
+`no-restricted-imports` rule forbids `next`, `next/*`, `react`, `react/*`,
+`react-dom`, `server-only`, `@/app/*` and `@/components/*` there (sole
+exemption: `src/lib/utils.ts`, the Tailwind `cn` helper; `eslint.config.mjs`
+is the authoritative list). The worker executes this core directly with Bun
 (`bun run src/worker/index.ts`) — no separate build. The Docker image has two
 targets from one build context: `app` (Next standalone on Node) and `worker`
 (source + node_modules on Bun); the worker image doubles as the compose

@@ -62,9 +62,17 @@ jobs:
         run: |
           bun run worker > worker.log 2>&1 &
           WORKER_PID=$!
-          sleep 8
-          cat worker.log
-          grep -q "lock acquired" worker.log
+          # Readiness poll (not a fixed delay): pass as soon as the lock is
+          # acquired, fail fast if the process dies, time out at 30s. The
+          # trap guarantees log output and process cleanup on any failure.
+          trap 'cat worker.log; kill -9 $WORKER_PID 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 30); do
+            if grep -q "lock acquired" worker.log; then ready=1; break; fi
+            kill -0 $WORKER_PID 2>/dev/null || break
+            sleep 1
+          done
+          [ "$ready" = "1" ]
           kill -TERM $WORKER_PID
           # Bounded shutdown: SIGKILL if graceful exit regresses.
           for i in $(seq 1 10); do

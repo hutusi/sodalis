@@ -38,5 +38,6 @@ provenance) that must stay authoritative.
   provider drove every matching and UI verification.
 - A per-request DB read on authz is the price of freshness — negligible
   here.
-- Real-IdP OIDC remains the one untested integration; the runbook prescribes
-  a throwaway Keycloak before pointing at the corporate IdP.
+- Real-IdP OIDC remains the one untested integration;
+  [`docs/keycloak-dry-run.md`](../keycloak-dry-run.md) is the executable
+  dry-run to perform before pointing at the corporate IdP.
