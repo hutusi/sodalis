@@ -38,6 +38,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# agent skills auto-installed by `vercel integration add` (regenerable)
+/.agents/
+/.claude/skills/
+/skills-lock.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
