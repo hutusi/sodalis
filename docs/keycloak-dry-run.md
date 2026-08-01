@@ -6,13 +6,18 @@ before pointing at the real IdP.
 
 ## 1. Start Keycloak
 
+Bind to loopback only and generate the admin password — even a throwaway
+realm must not be administrable by others on the network. Run this on your
+own machine, not a shared or exposed host.
+
 ```bash
-docker run --rm -p 8080:8080 \
-  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+KC_PASS=$(openssl rand -hex 12) && echo "Keycloak admin password: $KC_PASS"
+docker run --rm -p 127.0.0.1:8080:8080 \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD="$KC_PASS" \
   quay.io/keycloak/keycloak:latest start-dev
 ```
 
-Admin console: http://localhost:8080 (admin / admin).
+Admin console: http://localhost:8080 (admin / the generated password).
 
 ## 2. Create the realm, client and a test user
 
@@ -54,6 +59,17 @@ OIDC_ADMIN_GROUP=sodalis-admins   # only if you did step 5
 - A user with no email in Keycloak is rejected with an error page, not a
   silent redirect loop.
 
-Against the real IdP later, the only expected differences are the issuer
-URL and claim names — map those with `OIDC_CLAIM_DEPARTMENT` /
-`OIDC_CLAIM_OFFICE` / `OIDC_ADMIN_GROUP` instead of code changes.
+A passing dry-run validates the flow, not the corporate IdP's specifics.
+Claim names map via `OIDC_CLAIM_DEPARTMENT` / `OIDC_CLAIM_OFFICE` /
+`OIDC_ADMIN_GROUP` without code changes, but confirm the rest with your
+IdP team before production:
+
+- required scopes beyond `openid profile email`, and whether claims arrive
+  in the ID token or only via the userinfo endpoint;
+- client-authentication method (client secret vs private key JWT) and
+  whether PKCE is mandatory;
+- group-claim shape — names vs full paths (Sodalis matches
+  `OIDC_ADMIN_GROUP` by exact string), and whether groups are in the token
+  at all;
+- discovery metadata reachability from the app host (issuer URL must serve
+  `/.well-known/openid-configuration` on the intranet).
