@@ -72,6 +72,9 @@ const schema = z.object({
   CRON_SECRET: z.string().optional(),
 });
 
+/** Exported for tests: parse a controlled input instead of process.env. */
+export const envSchema = schema;
+
 const DEV_FALLBACK_SECRET = "dev-secret-change-me";
 const DEV_FALLBACK_DB = "postgres://sodalis:sodalis@localhost:5432/sodalis";
 

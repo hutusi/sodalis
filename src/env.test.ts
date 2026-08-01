@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { adminEmails, env } from "./env";
+import { adminEmails, env, envSchema } from "./env";
 
 describe("env", () => {
   test("parses with defaults", () => {
@@ -15,9 +15,12 @@ describe("env", () => {
   });
 
   test("serverless knobs default safely", () => {
-    expect(env.DB_POOL_MAX).toBe(10);
-    expect(env.DB_IDLE_TIMEOUT).toBe(20);
-    expect(env.DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION).toBe(false);
-    expect(env.CRON_SECRET).toBeUndefined();
+    // Parse an empty input rather than asserting on `env`: the live values
+    // legitimately vary with whatever .env the machine has.
+    const parsed = envSchema.parse({});
+    expect(parsed.DB_POOL_MAX).toBe(10);
+    expect(parsed.DB_IDLE_TIMEOUT).toBe(20);
+    expect(parsed.DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION).toBe(false);
+    expect(parsed.CRON_SECRET).toBeUndefined();
   });
 });
