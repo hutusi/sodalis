@@ -23,13 +23,18 @@ import {
 } from "../../src/db/schema";
 
 export type Fixtures = {
+  /** First fixture office — convenience for single-office scripts. */
   officeId: string;
+  officeIds: string[];
   timezone: string;
   userIds: string[];
   cleanup: () => Promise<void>;
 };
 
-export async function createFixtures(userCount: number): Promise<Fixtures> {
+export async function createFixtures(
+  userCount: number,
+  officeCount = 1,
+): Promise<Fixtures> {
   const tag = `verify-${Date.now()}-${process.pid}`;
   const timezone = "Asia/Shanghai";
 
@@ -37,15 +42,18 @@ export async function createFixtures(userCount: number): Promise<Fixtures> {
     .insert(cities)
     .values({ nameEn: `${tag}-city`, nameZh: tag, timezone, isActive: false })
     .returning({ id: cities.id });
-  const [office] = await db
+  const officeRows = await db
     .insert(offices)
-    .values({
-      cityId: city.id,
-      nameEn: `${tag}-office`,
-      nameZh: tag,
-      isActive: false,
-    })
+    .values(
+      Array.from({ length: officeCount }, (_, i) => ({
+        cityId: city.id,
+        nameEn: `${tag}-office-${i}`,
+        nameZh: `${tag}-${i}`,
+        isActive: false,
+      })),
+    )
     .returning({ id: offices.id });
+  const officeIds = officeRows.map((o) => o.id);
   const userRows = await db
     .insert(users)
     .values(
@@ -53,7 +61,7 @@ export async function createFixtures(userCount: number): Promise<Fixtures> {
         email: `${tag}-${i}@verify.local`,
         name: `Verify ${i}`,
         department: `verify-dept-${i % 3}`,
-        officeId: office.id,
+        officeId: officeIds[0],
       })),
     )
     .returning({ id: users.id });
@@ -63,7 +71,7 @@ export async function createFixtures(userCount: number): Promise<Fixtures> {
     const runs = await db
       .select({ id: matchRuns.id })
       .from(matchRuns)
-      .where(eq(matchRuns.officeId, office.id));
+      .where(inArray(matchRuns.officeId, officeIds));
     const runIds = runs.map((r) => r.id);
     if (runIds.length > 0) {
       const groups = await db
@@ -99,9 +107,9 @@ export async function createFixtures(userCount: number): Promise<Fixtures> {
       await db.delete(matchRuns).where(inArray(matchRuns.id, runIds));
     }
     await db.delete(users).where(inArray(users.id, userIds));
-    await db.delete(offices).where(eq(offices.id, office.id));
+    await db.delete(offices).where(inArray(offices.id, officeIds));
     await db.delete(cities).where(eq(cities.id, city.id));
   }
 
-  return { officeId: office.id, timezone, userIds, cleanup };
+  return { officeId: officeIds[0], officeIds, timezone, userIds, cleanup };
 }

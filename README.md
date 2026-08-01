@@ -1,5 +1,7 @@
 # Sodalis · 随机午餐
 
+[![CI](https://github.com/hutusi/sodalis/actions/workflows/ci.yml/badge.svg)](https://github.com/hutusi/sodalis/actions/workflows/ci.yml)
+
 Random lunch matching for colleagues. Employees sign up before 10:30, the
 matcher builds cross-department groups of 2–4 per office, and everyone gets
 an email with their group, a volunteer host (搭主) and a suggested cafeteria
@@ -67,10 +69,22 @@ Compose starts Postgres, runs migrations as a one-shot job, then the app
 3. Register the OIDC client at your IdP (redirect URI
    `{AUTH_URL}/api/auth/callback/oidc`); optionally configure `LDAP_*` as a
    password fallback. Claim/attribute names are mapped via env vars.
+   Before pointing at the corporate IdP, dry-run the OIDC flow against a
+   throwaway Keycloak — step-by-step in
+   [`docs/keycloak-dry-run.md`](docs/keycloak-dry-run.md).
 4. Keep the holiday calendar current each year: drop the official schedule
    into `data/holidays-cn-<year>.json` and run
    `docker compose run --rm worker bun run holidays:import data/holidays-cn-<year>.json`,
    or edit dates in `/admin/holidays`.
+
+## Docs
+
+- [`docs/architecture.md`](docs/architecture.md) — components, the daily
+  matching cycle, and the invariants table (which unique key / lock / CAS
+  guarantees what).
+- [`docs/adr/`](docs/adr/) — architecture decision records: the rationale
+  behind every non-obvious choice, including the ones that were reversed
+  during review.
 
 ## Repository layout
 

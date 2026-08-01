@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: these jobs only read the repo.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck · Lint · Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun test
+      # Informational only: report known-vulnerable dependencies.
+      - run: bun audit
+        continue-on-error: true
+
+  integration:
+    name: DB integration checks
+    runs-on: ubuntu-latest
+    # Advisory-lock tests could hang on a deadlock regression — bound them.
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sodalis
+          POSTGRES_PASSWORD: sodalis
+          POSTGRES_DB: sodalis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sodalis"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://sodalis:sodalis@localhost:5432/sodalis
+      PGPASSWORD: sodalis
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run db:migrate
+      - run: bun run seed --demo
+      # The outbox check creates a throwaway database.
+      - run: psql -h localhost -U sodalis -d sodalis -c "ALTER ROLE sodalis CREATEDB"
+      - run: bun run scripts/verify/signup-contention.ts
+      - run: bun run scripts/verify/catchup-recovery.ts
+      - run: bun run scripts/verify/outbox-cancel-mid-batch.ts
+      - name: Worker boot smoke
+        run: |
+          bun run worker > worker.log 2>&1 &
+          WORKER_PID=$!
+          # Readiness poll (not a fixed delay): pass as soon as the lock is
+          # acquired, fail fast if the process dies, time out at 30s. The
+          # trap guarantees log output and process cleanup on any failure.
+          trap 'cat worker.log; kill -9 $WORKER_PID 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 30); do
+            if grep -q "lock acquired" worker.log; then ready=1; break; fi
+            kill -0 $WORKER_PID 2>/dev/null || break
+            sleep 1
+          done
+          [ "$ready" = "1" ]
+          kill -TERM $WORKER_PID
+          # Bounded shutdown: SIGKILL if graceful exit regresses.
+          for i in $(seq 1 10); do
+            kill -0 $WORKER_PID 2>/dev/null || break
+            sleep 1
+          done
+          kill -9 $WORKER_PID 2>/dev/null || true
+          grep -q "shutting down" worker.log
+
+  build:
+    name: Next build · Docker images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Docker build (app target)
+        run: docker build -f docker/Dockerfile --target app -t sodalis-app .
+      - name: Docker build (worker target)
+        run: docker build -f docker/Dockerfile --target worker -t sodalis-worker .
