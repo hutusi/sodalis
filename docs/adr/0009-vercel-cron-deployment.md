@@ -25,8 +25,10 @@ worker is untouched. On Vercel:
   disabled while `CRON_SECRET` is unset.
 - The worker's **session advisory lock is deliberately not ported**. It only
   serialized whole workers as an efficiency measure; concurrent invocations
-  are tolerated instead and cost duplicate reads, never duplicate matches or
-  emails (partial unique index, xact advisory locks, outbox CAS).
+  are tolerated instead and cost duplicate reads, never duplicate matches
+  (partial unique index, xact advisory locks). Healthy concurrent
+  dispatchers never double-claim an email (`SKIP LOCKED` + CAS), but
+  delivery remains at-least-once across crashes — see Consequences.
 - The trigger is external: a GitHub Actions schedule every 5 minutes
   (`.github/workflows/cron-tick.yml`), because Hobby-plan Vercel Crons are
   daily-only. On Pro, replace it with a per-minute `vercel.json` cron.

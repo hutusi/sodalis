@@ -13,7 +13,9 @@ const MAX_DRAIN_PASSES = 5;
  * Serverless stand-in for the worker loop (ADR-0009): one scheduler tick,
  * then the outbox drained until empty. Safe to invoke concurrently — all
  * idempotency lives in Postgres (ADR-0003/0005), so an overlapping call
- * costs duplicate reads, never duplicate matches or emails.
+ * costs duplicate reads, never duplicate matches; concurrent dispatchers
+ * never double-claim an email, though delivery stays at-least-once across
+ * crashes (a send that dies after SMTP accept is reclaimed and resent).
  *
  * The response body stays opaque (status flags and counts only): the public
  * cron workflow prints bodies into public Actions logs, so failure detail
