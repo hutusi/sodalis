@@ -60,9 +60,11 @@ OIDC_ADMIN_GROUP=sodalis-admins   # only if you did step 5
   silent redirect loop.
 
 A passing dry-run validates the flow, not the corporate IdP's specifics.
-Claim names map via `OIDC_CLAIM_DEPARTMENT` / `OIDC_CLAIM_OFFICE` /
-`OIDC_ADMIN_GROUP` without code changes, but confirm the rest with your
-IdP team before production:
+Claim *names* map via `OIDC_CLAIM_DEPARTMENT` / `OIDC_CLAIM_OFFICE`;
+`OIDC_ADMIN_GROUP` is different — it is the exact group *value* looked up
+inside the (hard-coded) `groups` claim, e.g. `sodalis-admins`, not a claim
+name. Both work without code changes, but confirm the rest with your IdP
+team before production:
 
 - required scopes beyond `openid profile email`, and whether claims arrive
   in the ID token or only via the userinfo endpoint;
