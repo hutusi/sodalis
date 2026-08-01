@@ -14,6 +14,10 @@ const MAX_DRAIN_PASSES = 5;
  * then the outbox drained until empty. Safe to invoke concurrently — all
  * idempotency lives in Postgres (ADR-0003/0005), so an overlapping call
  * costs duplicate reads, never duplicate matches or emails.
+ *
+ * The response body stays opaque (status flags and counts only): the public
+ * cron workflow prints bodies into public Actions logs, so failure detail
+ * goes to console.error → runtime logs instead.
  */
 export async function GET(request: Request) {
   if (
@@ -22,17 +26,18 @@ export async function GET(request: Request) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  let tickError: string | undefined;
+  let tickFailed = false;
+  let failedMatches = 0;
   try {
-    await schedulerTick();
+    ({ failedMatches } = await schedulerTick());
   } catch (error) {
-    tickError = error instanceof Error ? error.message : String(error);
-    console.error(`[cron] scheduler tick failed: ${tickError}`);
+    tickFailed = true;
+    console.error("[cron] scheduler tick failed:", error);
   }
 
   // Queued emails must not be hostage to a tick bug — drain regardless.
+  let outboxFailed = false;
   let outboxSent = 0;
-  let outboxError: string | undefined;
   try {
     for (let pass = 0; pass < MAX_DRAIN_PASSES; pass++) {
       const sent = await dispatchOutbox();
@@ -40,18 +45,18 @@ export async function GET(request: Request) {
       if (sent === 0) break;
     }
   } catch (error) {
-    outboxError = error instanceof Error ? error.message : String(error);
-    console.error(`[cron] outbox dispatch failed: ${outboxError}`);
+    outboxFailed = true;
+    console.error("[cron] outbox dispatch failed:", error);
   }
 
-  const ok = !tickError && !outboxError;
+  const ok = !tickFailed && !outboxFailed && failedMatches === 0;
   return Response.json(
     {
       ok,
-      tick: tickError ? "failed" : "ok",
-      ...(tickError && { tickError }),
+      tick: tickFailed ? "failed" : "ok",
+      outbox: outboxFailed ? "failed" : "ok",
+      failedMatches,
       outboxSent,
-      ...(outboxError && { outboxError }),
     },
     { status: ok ? 200 : 500 },
   );
