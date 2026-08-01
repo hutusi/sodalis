@@ -13,7 +13,9 @@ export const oidcEnabled = Boolean(
 );
 export const ldapEnabled = Boolean(env.LDAP_URL && env.LDAP_BIND_DN_TEMPLATE);
 export const devLoginEnabled =
-  env.DEV_LOGIN_ENABLED && env.NODE_ENV !== "production";
+  env.DEV_LOGIN_ENABLED &&
+  (env.NODE_ENV !== "production" ||
+    env.DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION);
 
 declare module "next-auth" {
   interface Session {

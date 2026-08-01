@@ -1,0 +1,24 @@
+# Hobby-plan stand-in for Vercel Cron (per-minute crons need Pro): hit the
+# CRON_SECRET-guarded tick route every 5 minutes. GitHub cron is best-effort
+# — minutes of jitter are normal and absorbed by the MATCH_CATCH_UP_HOURS
+# window — and scheduled workflows are auto-disabled after 60 days without
+# repo activity. On Pro, delete this file and declare the cron in
+# vercel.json: { "crons": [{ "path": "/api/cron/tick", "schedule": "* * * * *" }] }
+name: cron-tick
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger scheduler tick
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 290 \
+            -H "Authorization: Bearer ${{ secrets.SODALIS_CRON_SECRET }}" \
+            https://sodalis-hutusis-projects.vercel.app/api/cron/tick

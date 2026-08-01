@@ -5,6 +5,7 @@ import { cities, notifications, offices } from "@/db/schema";
 import { env } from "@/env";
 import { isWorkingDay } from "../calendar";
 import { runMatch } from "../matching/run";
+import { emailNotifier } from "../notify/email";
 import { getActiveActivities, loadHolidayMap } from "../queries";
 import { composeLocalTime, localDateFor } from "../time";
 import { materializeStanding } from "./materialize";
@@ -24,8 +25,14 @@ const SLA_LAG_MS = 15 * 60_000;
  *                            transaction (downtime catch-up), restricted to
  *                            rules unchanged since close, and no-ops when a
  *                            live run already exists
+ *
+ * Returns the count of failed match runs — runMatch reports failures as a
+ * result, not a throw, so HTTP callers need it to signal an unhealthy pass
+ * (ADR-0009). The worker ignores the return value.
  */
-export async function schedulerTick(now: Date = new Date()): Promise<void> {
+export async function schedulerTick(
+  now: Date = new Date(),
+): Promise<{ failedMatches: number }> {
   const officeRows = await db
     .select({
       officeId: offices.id,
@@ -36,7 +43,10 @@ export async function schedulerTick(now: Date = new Date()): Promise<void> {
     .innerJoin(cities, eq(offices.cityId, cities.id))
     .where(and(eq(offices.isActive, true), eq(cities.isActive, true)));
   const activities = await getActiveActivities();
-  if (officeRows.length === 0 || activities.length === 0) return;
+  let failedMatches = 0;
+  if (officeRows.length === 0 || activities.length === 0) {
+    return { failedMatches };
+  }
 
   const localDates = officeRows.map((o) => localDateFor(now, o.timezone));
   const holidays = await loadHolidayMap(
@@ -82,6 +92,7 @@ export async function schedulerTick(now: Date = new Date()): Promise<void> {
             `[tick] matched ${office.officeName} ${activity.key} ${localDate} → run ${result.runId}`,
           );
         } else if (result.outcome === "failed") {
+          failedMatches++;
           console.error(
             `[tick] match FAILED for ${office.officeName} ${activity.key} ${localDate}: ${result.error}`,
           );
@@ -92,6 +103,9 @@ export async function schedulerTick(now: Date = new Date()): Promise<void> {
 
   // Delivery-lag warning, once per tick (not per office×activity): pending
   // rows that have sat longer than the SLA lag mean SMTP is down or slow.
+  // Suppressed while SMTP is deliberately unconfigured — queued-forever is
+  // the intended state there, not an incident.
+  if (!emailNotifier.isConfigured()) return { failedMatches };
   const [{ value: lagging }] = await db
     .select({ value: count() })
     .from(notifications)
@@ -106,4 +120,5 @@ export async function schedulerTick(now: Date = new Date()): Promise<void> {
       `[tick] SLA: ${lagging} notification(s) pending for more than ${SLA_LAG_MS / 60_000} minutes`,
     );
   }
+  return { failedMatches };
 }

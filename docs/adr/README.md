@@ -10,6 +10,7 @@
 | [0006](0006-admin-provenance.md) | Admin-grant provenance: sticky manual, env, reaffirmed group | Accepted |
 | [0007](0007-snapshot-semantics.md) | Snapshot-at-materialization semantics; catch-up cutoff | Accepted (v1 limitation, see issue #2) |
 | [0008](0008-auth-shape.md) | Auth.js JWT sessions without a DB adapter; per-request authz | Accepted |
+| [0009](0009-vercel-cron-deployment.md) | Cron-triggered scheduling for serverless deployment (Vercel) | Accepted |
 
 Format: Status / Date / Context / Decision / Consequences. New decisions get
 the next number; superseding an ADR links both ways.

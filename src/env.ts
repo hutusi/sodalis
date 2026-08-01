@@ -11,6 +11,11 @@ const schema = z.object({
     .default("development"),
 
   DATABASE_URL: z.string().optional(),
+  // Connection pool, per process. Serverless deployments size this down and
+  // let idle connections close so managed Postgres can autosuspend:
+  // postgres-js throws on fractional/negative pool sizes — reject at parse.
+  DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  DB_IDLE_TIMEOUT: z.coerce.number().int().nonnegative().default(20), // seconds; 0 keeps connections open
 
   // Auth.js
   AUTH_SECRET: z.string().optional(),
@@ -39,6 +44,13 @@ const schema = z.object({
     .string()
     .default("false")
     .transform((v) => v === "true"),
+  // Escape hatch for disposable demo deployments without a reachable IdP
+  // (ADR-0009): lets DEV_LOGIN_ENABLED work in production. Anyone who knows
+  // a seeded email gets that user's session — never set this on real data.
+  DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
 
   // Admin bootstrap: comma-separated emails granted is_admin at login
   ADMIN_EMAILS: z.string().default(""),
@@ -56,7 +68,13 @@ const schema = z.object({
 
   // Scheduler
   MATCH_CATCH_UP_HOURS: z.coerce.number().default(3),
+  // Serverless deployments only (ADR-0009): /api/cron/tick accepts
+  // `Authorization: Bearer <CRON_SECRET>` and stays disabled while unset.
+  CRON_SECRET: z.string().optional(),
 });
+
+/** Exported for tests: parse a controlled input instead of process.env. */
+export const envSchema = schema;
 
 const DEV_FALLBACK_SECRET = "dev-secret-change-me";
 const DEV_FALLBACK_DB = "postgres://sodalis:sodalis@localhost:5432/sodalis";
@@ -91,9 +109,16 @@ if (parsed.NODE_ENV === "production" && !isBuildPhase) {
     throw new Error("DATABASE_URL must be set explicitly in production");
   }
   if (parsed.DEV_LOGIN_ENABLED) {
-    // auth/index.ts also ignores the flag in production; this hard stop
-    // makes the misconfiguration impossible to miss.
-    throw new Error("DEV_LOGIN_ENABLED must not be true in production");
+    if (!parsed.DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION) {
+      // auth/index.ts also ignores the flag in production; this hard stop
+      // makes the misconfiguration impossible to miss.
+      throw new Error(
+        "DEV_LOGIN_ENABLED must not be true in production (DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION exists for disposable demo deployments only)",
+      );
+    }
+    console.warn(
+      "⚠️  DEV LOGIN IS ENABLED IN PRODUCTION — anyone who knows a seeded email can sign in as that user. Demo deployments only (ADR-0009).",
+    );
   }
 }
 
