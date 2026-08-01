@@ -13,8 +13,9 @@ const schema = z.object({
   DATABASE_URL: z.string().optional(),
   // Connection pool, per process. Serverless deployments size this down and
   // let idle connections close so managed Postgres can autosuspend:
-  DB_POOL_MAX: z.coerce.number().default(10),
-  DB_IDLE_TIMEOUT: z.coerce.number().default(20), // seconds; 0 keeps connections open
+  // postgres-js throws on fractional/negative pool sizes — reject at parse.
+  DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  DB_IDLE_TIMEOUT: z.coerce.number().int().nonnegative().default(20), // seconds; 0 keeps connections open
 
   // Auth.js
   AUTH_SECRET: z.string().optional(),

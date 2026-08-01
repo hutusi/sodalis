@@ -23,4 +23,13 @@ describe("env", () => {
     expect(parsed.DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION).toBe(false);
     expect(parsed.CRON_SECRET).toBeUndefined();
   });
+
+  test("pool knobs reject values postgres-js would choke on", () => {
+    expect(() => envSchema.parse({ DB_POOL_MAX: "1.5" })).toThrow();
+    expect(() => envSchema.parse({ DB_POOL_MAX: "-1" })).toThrow();
+    expect(() => envSchema.parse({ DB_POOL_MAX: "0" })).toThrow();
+    expect(() => envSchema.parse({ DB_IDLE_TIMEOUT: "-5" })).toThrow();
+    // 0 is meaningful for the idle timeout: postgres-js "keep connections open"
+    expect(envSchema.parse({ DB_IDLE_TIMEOUT: "0" }).DB_IDLE_TIMEOUT).toBe(0);
+  });
 });
