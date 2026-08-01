@@ -30,11 +30,15 @@ worker is untouched. On Vercel:
 - The trigger is external: a GitHub Actions schedule every 5 minutes
   (`.github/workflows/cron-tick.yml`), because Hobby-plan Vercel Crons are
   daily-only. On Pro, replace it with a per-minute `vercel.json` cron.
-- Postgres is Neon via the Vercel Marketplace. The app prefers the injected
-  **direct (unpooled)** `DATABASE_URL_UNPOOLED` — postgres-js prepared
-  statements and drizzle-kit both misbehave over transaction pooling. The
-  pool gains `idle_timeout` (and env-tunable size) so idle functions release
-  connections and Neon can autosuspend.
+- Postgres is Neon via the Vercel Marketplace. The app runs on the **pooled**
+  `DATABASE_URL` with `prepare: false` (named prepared statements break
+  through PgBouncer transaction pooling); the injected direct
+  `DATABASE_URL_UNPOOLED` is consumed only by drizzle-kit, which is
+  unreliable over a pooler. The worker's session advisory lock also needs a
+  direct connection, but the worker only runs under Compose, where
+  `DATABASE_URL` is direct anyway. The pool gains `idle_timeout` (and
+  env-tunable size) so idle functions release connections and Neon can
+  autosuspend.
 - Sign-in for the trial uses the dev-login provider behind a second, loudly
   named flag (`DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION`) since the
   corporate IdP/LDAP are unreachable from Vercel. It still only signs in

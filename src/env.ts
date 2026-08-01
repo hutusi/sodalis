@@ -11,11 +11,6 @@ const schema = z.object({
     .default("development"),
 
   DATABASE_URL: z.string().optional(),
-  // Direct (unpooled) connection injected by managed-Postgres integrations
-  // (e.g. Vercel's Neon Marketplace); preferred over DATABASE_URL when set —
-  // postgres-js prepared statements and drizzle-kit both misbehave over
-  // transaction pooling.
-  DATABASE_URL_UNPOOLED: z.string().optional(),
   // Connection pool, per process. Serverless deployments size this down and
   // let idle connections close so managed Postgres can autosuspend:
   DB_POOL_MAX: z.coerce.number().default(10),
@@ -106,7 +101,7 @@ if (parsed.NODE_ENV === "production" && !isBuildPhase) {
       "AUTH_SECRET must be set to a strong value in production — generate one with: openssl rand -base64 32",
     );
   }
-  if (!parsed.DATABASE_URL && !parsed.DATABASE_URL_UNPOOLED) {
+  if (!parsed.DATABASE_URL) {
     throw new Error("DATABASE_URL must be set explicitly in production");
   }
   if (parsed.DEV_LOGIN_ENABLED) {
@@ -126,8 +121,7 @@ if (parsed.NODE_ENV === "production" && !isBuildPhase) {
 export const env: Env = {
   ...parsed,
   AUTH_SECRET: parsed.AUTH_SECRET ?? DEV_FALLBACK_SECRET,
-  DATABASE_URL:
-    parsed.DATABASE_URL_UNPOOLED ?? parsed.DATABASE_URL ?? DEV_FALLBACK_DB,
+  DATABASE_URL: parsed.DATABASE_URL ?? DEV_FALLBACK_DB,
 };
 
 export const adminEmails = new Set(
