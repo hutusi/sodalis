@@ -5,6 +5,7 @@ import { cities, notifications, offices } from "@/db/schema";
 import { env } from "@/env";
 import { isWorkingDay } from "../calendar";
 import { runMatch } from "../matching/run";
+import { emailNotifier } from "../notify/email";
 import { getActiveActivities, loadHolidayMap } from "../queries";
 import { composeLocalTime, localDateFor } from "../time";
 import { materializeStanding } from "./materialize";
@@ -92,6 +93,9 @@ export async function schedulerTick(now: Date = new Date()): Promise<void> {
 
   // Delivery-lag warning, once per tick (not per office×activity): pending
   // rows that have sat longer than the SLA lag mean SMTP is down or slow.
+  // Suppressed while SMTP is deliberately unconfigured — queued-forever is
+  // the intended state there, not an incident.
+  if (!emailNotifier.isConfigured()) return;
   const [{ value: lagging }] = await db
     .select({ value: count() })
     .from(notifications)

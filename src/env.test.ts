@@ -13,4 +13,11 @@ describe("env", () => {
       expect(e).toBe(e.toLowerCase());
     }
   });
+
+  test("serverless knobs default safely", () => {
+    expect(env.DB_POOL_MAX).toBe(10);
+    expect(env.DB_IDLE_TIMEOUT).toBe(20);
+    expect(env.DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION).toBe(false);
+    expect(env.CRON_SECRET).toBeUndefined();
+  });
 });

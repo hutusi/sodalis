@@ -11,6 +11,15 @@ const schema = z.object({
     .default("development"),
 
   DATABASE_URL: z.string().optional(),
+  // Direct (unpooled) connection injected by managed-Postgres integrations
+  // (e.g. Vercel's Neon Marketplace); preferred over DATABASE_URL when set —
+  // postgres-js prepared statements and drizzle-kit both misbehave over
+  // transaction pooling.
+  DATABASE_URL_UNPOOLED: z.string().optional(),
+  // Connection pool, per process. Serverless deployments size this down and
+  // let idle connections close so managed Postgres can autosuspend:
+  DB_POOL_MAX: z.coerce.number().default(10),
+  DB_IDLE_TIMEOUT: z.coerce.number().default(20), // seconds; 0 keeps connections open
 
   // Auth.js
   AUTH_SECRET: z.string().optional(),
@@ -39,6 +48,13 @@ const schema = z.object({
     .string()
     .default("false")
     .transform((v) => v === "true"),
+  // Escape hatch for disposable demo deployments without a reachable IdP
+  // (ADR-0009): lets DEV_LOGIN_ENABLED work in production. Anyone who knows
+  // a seeded email gets that user's session — never set this on real data.
+  DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
 
   // Admin bootstrap: comma-separated emails granted is_admin at login
   ADMIN_EMAILS: z.string().default(""),
@@ -56,6 +72,9 @@ const schema = z.object({
 
   // Scheduler
   MATCH_CATCH_UP_HOURS: z.coerce.number().default(3),
+  // Serverless deployments only (ADR-0009): /api/cron/tick accepts
+  // `Authorization: Bearer <CRON_SECRET>` and stays disabled while unset.
+  CRON_SECRET: z.string().optional(),
 });
 
 const DEV_FALLBACK_SECRET = "dev-secret-change-me";
@@ -87,20 +106,28 @@ if (parsed.NODE_ENV === "production" && !isBuildPhase) {
       "AUTH_SECRET must be set to a strong value in production — generate one with: openssl rand -base64 32",
     );
   }
-  if (!parsed.DATABASE_URL) {
+  if (!parsed.DATABASE_URL && !parsed.DATABASE_URL_UNPOOLED) {
     throw new Error("DATABASE_URL must be set explicitly in production");
   }
   if (parsed.DEV_LOGIN_ENABLED) {
-    // auth/index.ts also ignores the flag in production; this hard stop
-    // makes the misconfiguration impossible to miss.
-    throw new Error("DEV_LOGIN_ENABLED must not be true in production");
+    if (!parsed.DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION) {
+      // auth/index.ts also ignores the flag in production; this hard stop
+      // makes the misconfiguration impossible to miss.
+      throw new Error(
+        "DEV_LOGIN_ENABLED must not be true in production (DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION exists for disposable demo deployments only)",
+      );
+    }
+    console.warn(
+      "⚠️  DEV LOGIN IS ENABLED IN PRODUCTION — anyone who knows a seeded email can sign in as that user. Demo deployments only (ADR-0009).",
+    );
   }
 }
 
 export const env: Env = {
   ...parsed,
   AUTH_SECRET: parsed.AUTH_SECRET ?? DEV_FALLBACK_SECRET,
-  DATABASE_URL: parsed.DATABASE_URL ?? DEV_FALLBACK_DB,
+  DATABASE_URL:
+    parsed.DATABASE_URL_UNPOOLED ?? parsed.DATABASE_URL ?? DEV_FALLBACK_DB,
 };
 
 export const adminEmails = new Set(
