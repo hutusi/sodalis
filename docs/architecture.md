@@ -59,7 +59,7 @@ reproducible from their stored seed. See [ADR-0004](adr/0004-matching-engine.md)
 | A stale request can't mutate a row that moved to another office (whose lock it doesn't hold) | signup writes are compare-and-set against the pre-validated (office, status) — mismatches throw a retryable conflict (`src/lib/signup.ts`) |
 | No duplicate notification per run × user; re-enqueue is a no-op | unique `notifications.dedupe_key` = `match:{run}:{user}` |
 | A superseded run's undelivered emails never go out | supersede cancels pending+sending rows; every dispatcher status write is compare-and-set on `status='sending'`; per-send freshness re-read ([ADR-0005](adr/0005-notification-outbox.md)) |
-| Two workers never run loops concurrently | session advisory lock at boot + 60s self-check that exits on lock loss |
+| Two workers never run loops concurrently | session advisory lock at boot + 60s self-check that exits on lock loss (Compose; the serverless target tolerates concurrent invocations instead — [ADR-0009](adr/0009-vercel-cron-deployment.md)) |
 | Repeat-penalty history is always the live (non-superseded) truth | `match_pairs` rows are deleted when their run is superseded |
 | Admin rights can't be dodged or permanently over-granted | provenance model: sticky `manual`, env-checked `env`, reaffirmation-required `group` ([ADR-0006](adr/0006-admin-provenance.md)) |
 
@@ -73,7 +73,11 @@ reproducible from their stored seed. See [ADR-0004](adr/0004-matching-engine.md)
   v1 limitation — see [ADR-0007](adr/0007-snapshot-semantics.md) and issue #2.
 - **SLA signal**: the tick warns once per pass when pending notifications are
   older than 15 minutes (SMTP down or slow); per-recipient delivery state is
-  in the admin run view.
+  in the admin run view. Suppressed while SMTP is deliberately unconfigured.
+- **Serverless deployment**: on Vercel there is no worker process — a
+  CRON_SECRET-guarded route (`/api/cron/tick`) runs the same tick + outbox
+  drain, triggered externally every few minutes. See
+  [ADR-0009](adr/0009-vercel-cron-deployment.md).
 - **Holiday calendar**: `holiday_calendar` drives working-day logic including
   调休 makeup workdays; refresh it yearly (`bun run holidays:import`), or edit
   in `/admin/holidays`.

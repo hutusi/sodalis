@@ -77,6 +77,28 @@ Compose starts Postgres, runs migrations as a one-shot job, then the app
    `docker compose run --rm worker bun run holidays:import data/holidays-cn-<year>.json`,
    or edit dates in `/admin/holidays`.
 
+## Deployment (Vercel trial)
+
+An additive serverless target — Compose above stays primary;
+[ADR-0009](docs/adr/0009-vercel-cron-deployment.md) records the trade-offs.
+The worker is replaced by a CRON_SECRET-guarded route, `/api/cron/tick`,
+running the same scheduler tick and outbox drain;
+`.github/workflows/cron-tick.yml` triggers it every 5 minutes (Hobby plan —
+on Pro use a per-minute Vercel Cron instead).
+
+```bash
+vercel link && vercel integration add neon   # injects DATABASE_URL(_UNPOOLED)
+# Set production env: AUTH_SECRET, CRON_SECRET, ADMIN_EMAILS, and either
+# OIDC_* or — demo data only — DEV_LOGIN_ENABLED=true plus
+# DEV_LOGIN_DANGEROUSLY_ALLOW_IN_PRODUCTION=true
+vercel env pull --environment=production .env.vercel-prod
+bun --env-file=.env.vercel-prod run db:migrate
+bun --env-file=.env.vercel-prod run seed --demo
+bun --env-file=.env.vercel-prod run holidays:import data/holidays-cn-2026.json
+vercel deploy --prod
+# GitHub: add repo secret SODALIS_CRON_SECRET (same value as CRON_SECRET)
+```
+
 ## Docs
 
 - [`docs/architecture.md`](docs/architecture.md) — components, the daily
