@@ -36,27 +36,33 @@ export async function GET(request: Request) {
   }
 
   // Queued emails must not be hostage to a tick bug — drain regardless.
-  let outboxFailed = false;
+  let outboxThrew = false;
   let outboxSent = 0;
+  let outboxFailed = 0;
   try {
     for (let pass = 0; pass < MAX_DRAIN_PASSES; pass++) {
-      const sent = await dispatchOutbox();
+      const { sent, failed } = await dispatchOutbox();
       outboxSent += sent;
+      outboxFailed += failed;
+      // Failed rows back off to a future nextAttemptAt, so keep draining
+      // only while something actually went out.
       if (sent === 0) break;
     }
   } catch (error) {
-    outboxFailed = true;
+    outboxThrew = true;
     console.error("[cron] outbox dispatch failed:", error);
   }
 
-  const ok = !tickFailed && !outboxFailed && failedMatches === 0;
+  const ok =
+    !tickFailed && !outboxThrew && failedMatches === 0 && outboxFailed === 0;
   return Response.json(
     {
       ok,
       tick: tickFailed ? "failed" : "ok",
-      outbox: outboxFailed ? "failed" : "ok",
+      outbox: outboxThrew || outboxFailed > 0 ? "failed" : "ok",
       failedMatches,
       outboxSent,
+      outboxFailed,
     },
     { status: ok ? 200 : 500 },
   );

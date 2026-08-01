@@ -43,7 +43,7 @@ jobs.push(
 jobs.push(
   new Cron("*/10 * * * * *", { protect: true }, async () => {
     try {
-      const sent = await dispatchOutbox();
+      const { sent } = await dispatchOutbox();
       if (sent > 0) console.log(`[worker] outbox: sent ${sent}`);
     } catch (error) {
       console.error("[worker] outbox pass failed:", error);

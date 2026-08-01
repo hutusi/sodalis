@@ -18,14 +18,20 @@ let warnedUnconfigured = false;
  * transaction. Failures back off exponentially (2^attempts minutes) and
  * give up into 'failed' after MAX_ATTEMPTS — visible in the admin runs
  * view rather than silently dropped.
+ *
+ * Returns per-pass counts: failures are handled here (backoff/CAS), but
+ * callers with a health signal (the cron route, ADR-0009) still need to
+ * see them — a pass where every send failed must not look successful.
  */
-export async function dispatchOutbox(now: Date = new Date()): Promise<number> {
+export async function dispatchOutbox(
+  now: Date = new Date(),
+): Promise<{ sent: number; failed: number }> {
   if (!emailNotifier.isConfigured()) {
     if (!warnedUnconfigured) {
       console.warn("[outbox] SMTP_HOST not set — notifications stay queued");
       warnedUnconfigured = true;
     }
-    return 0;
+    return { sent: 0, failed: 0 };
   }
 
   const claimed = await db.transaction(async (tx) => {
@@ -74,6 +80,7 @@ export async function dispatchOutbox(now: Date = new Date()): Promise<number> {
   });
 
   let sent = 0;
+  let failed = 0;
   for (const row of claimed) {
     const notifier = notifiers[row.channel];
     const attempt = row.attempts + 1;
@@ -108,6 +115,7 @@ export async function dispatchOutbox(now: Date = new Date()): Promise<number> {
         );
       sent++;
     } catch (error) {
+      failed++;
       const message = error instanceof Error ? error.message : String(error);
       const exhausted = attempt >= MAX_ATTEMPTS;
       await db
@@ -128,5 +136,5 @@ export async function dispatchOutbox(now: Date = new Date()): Promise<number> {
       );
     }
   }
-  return sent;
+  return { sent, failed };
 }
